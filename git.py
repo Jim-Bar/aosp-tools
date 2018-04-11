@@ -28,81 +28,32 @@
 import os
 import subprocess
 
-# This import can be safely ignored if it fails. Those items are used for type hints (PEP 484) in comments.
-# Refer to: https://www.python.org/dev/peps/pep-0484/
-# Also useful: http://mypy.readthedocs.io/en/latest/cheat_sheet.html
-try:
-    from typing import Dict, List, Any, Tuple, Union
-except ImportError:
-    Dict, List, Any, Tuple, Union = None, None, None, None, None
+from typing import List, Tuple
 
 
-class GitConfiguration(object):
-    """
-    Holds data on a Git configuration: user, server, ...
-    """
-
-    def __init__(self, user, server, protocol):
-        # type: (Union[str, None], str, str) -> None
-
-        self._user = user  # type: str
-        self._server = server  # type: str
-        self._protocol = protocol  # type: str
-
-    def get_url(self, repository_path, repository_name):
-        # type: (str, str) -> str
-
-        if self._protocol == 'file':
-            return 'file://{}/{}/{}'.format(self.server(), repository_path, repository_name)
-        elif self._protocol == 'ssh':
-            return '{}@{}:{}/{}'.format(self.user(), self.server(), repository_path, repository_name)
-        elif self._protocol == 'http':
-            return 'http://{}/{}/{}'.format(self.server(), repository_path, repository_name)
-        elif self._protocol == 'https':
-            return 'https://{}/{}/{}'.format(self.server(), repository_path, repository_name)
-
-    def server(self):
-        # type: () -> str
-
-        return self._server
-
-    def user(self):
-        # type: () -> str
-
-        return self._user
-
-
-class GitUtils(object):
+class _GitUtils(object):
     """
     Various utility methods for Git.
     """
 
     @staticmethod
-    def branch(working_directory):
-        # type: (str) -> str
-
+    def branch(working_directory: str) -> str:
         git_branch_command = ['git', 'branch']
 
         return subprocess.check_output(git_branch_command, cwd=working_directory).decode()
 
     @staticmethod
-    def checkout(reference, working_directory):
-        # type: (str, str) -> None
-
+    def checkout(reference: str, working_directory: str) -> None:
         git_checkout_command = ['git', 'checkout', reference]
         subprocess.check_call(git_checkout_command, cwd=working_directory)
 
     @staticmethod
-    def clone(repository_name, repository_path, working_directory, git_configuration):
-        # type: (str, str, str, GitConfiguration) -> None
-
-        git_clone_command = ['git', 'clone', git_configuration.get_url(repository_name, repository_path)]
+    def clone(working_directory: str, remote_url: str) -> None:
+        git_clone_command = ['git', 'clone', remote_url]
         subprocess.check_call(git_clone_command, cwd=working_directory)
 
     @staticmethod
-    def current_branch(working_directory):
-        # type: (str) -> str
-
+    def current_branch(working_directory: str) -> str:
         # Return the name of the current branch. If we are on a tag or particular commit, an exception is raised.
         git_symbolic_ref_command = ['git', 'symbolic-ref', 'HEAD']
         current_reference = subprocess.check_output(git_symbolic_ref_command, cwd=working_directory).decode()
@@ -110,26 +61,20 @@ class GitUtils(object):
         return current_reference.split('/').pop().strip()
 
     @staticmethod
-    def current_commit(working_directory):
-        # type: (str) -> str
-
+    def current_commit(working_directory: str) -> str:
         # Return the hash of the current commit.
         git_rev_parse_command = ['git', 'rev-parse', 'HEAD']
         return subprocess.check_output(git_rev_parse_command, cwd=working_directory).decode().strip()
 
     @staticmethod
-    def fetch(working_directory):
-        # type: (str) -> None
-
+    def fetch(working_directory: str) -> None:
         git_fetch_command = ['git', 'fetch']
         subprocess.check_call(git_fetch_command, cwd=working_directory)
 
     @staticmethod
-    def remote_refs(repository_name, repository_path, git_configuration):
-        # type: (str, str, GitConfiguration) -> Tuple[List[str], List[str]]
-
+    def remote_refs(remote_url: str) -> Tuple[List[str], List[str]]:
         # Get the references from the repository (the repository is not cloned).
-        git_ls_remote_command = ['git', 'ls-remote', git_configuration.get_url(repository_name, repository_path)]
+        git_ls_remote_command = ['git', 'ls-remote', remote_url]
         git_refs_raw = subprocess.check_output(git_ls_remote_command).splitlines()
 
         # Parse the output of 'git ls-remote' which is of the form:
@@ -142,23 +87,19 @@ class GitUtils(object):
         return git_heads, git_tags
 
     @staticmethod
-    def pull(working_directory):
-        # type: (str) -> None
-
+    def pull(working_directory: str) -> None:
         git_pull_command = ['git', 'pull']
         subprocess.check_call(git_pull_command, cwd=working_directory)
 
     @staticmethod
-    def name(working_directory):
-        # type: (str) -> str
-
+    def name(working_directory: str) -> str:
         # Return the name of the repository. The name is read based on the remote for push, so it may be incorrect.
         # If fetching the remote name fails (the repository does not have a remote, ...), an empty string is returned.
         git_remote_show_command = ['git', 'remote', 'show', '-n', 'origin']
         with open(os.devnull, 'w') as devnull:
             try:
                 git_remote_data = subprocess.check_output(git_remote_show_command, cwd=working_directory,
-                                                          stderr=devnull).decode('utf-8').splitlines()
+                                                          stderr=devnull).decode().splitlines()
             except subprocess.CalledProcessError:
                 # This is probably not a repository. In all cases, the name cannot be found, so return an empty string.
                 return ''
@@ -178,11 +119,9 @@ class GitUtils(object):
         return git_remote
 
     @staticmethod
-    def status(working_directory):
-        # type: (str) -> List[str]
-
+    def status(working_directory: str) -> List[str]:
         git_status_command = ['git', 'status', '-s']
-        return subprocess.check_output(git_status_command, cwd=working_directory)
+        return subprocess.check_output(git_status_command, cwd=working_directory).decode().split()
 
 
 class Repository(object):
@@ -190,12 +129,22 @@ class Repository(object):
     A repository is just a path and a name.
     """
 
-    def __init__(self, path, name):
+    def __init__(self, protocol: str, user: str, remote: str, path: str, name: str) -> None:
+        self._protocol = protocol
+        self._user = user
+        self._remote = remote
         self._path = path
         self._name = name
 
-    def path(self):
-        return self._path
+    def _get_remote_url(self) -> str:
+        if self._protocol == 'file':
+            return 'file://{}/{}/{}'.format(self._remote, self._path, self._name)
+        elif self._protocol == 'ssh':
+            return '{}@{}:{}/{}'.format(self._user, self._remote, self._path, self._name)
+        elif self._protocol == 'http':
+            return 'http://{}/{}/{}'.format(self._remote, self._path, self._name)
+        elif self._protocol == 'https':
+            return 'https://{}/{}/{}'.format(self._remote, self._path, self._name)
 
-    def name(self):
-        return self._name
+    def remote_refs(self) -> Tuple[List[str], List[str]]:
+        return _GitUtils.remote_refs(self._get_remote_url())

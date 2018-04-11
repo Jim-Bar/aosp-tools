@@ -26,8 +26,9 @@
 #
 
 import configparser
+import time
 
-from git import GitConfiguration, Repository
+from git import Repository
 from typing import List
 
 
@@ -36,7 +37,7 @@ class Configuration(configparser.ConfigParser):
     Read the default configuration file, and optionally the additional overriding configuration files if any.
     """
 
-    _SECTION_COMMAND_LINE_OPTIONS = 'CommandLineOptions'
+    _SECTION_COMMAND_LINE_DEFAULTS = 'CommandLineDefaults'
     _SECTION_DEVICES = 'Devices'
     _SECTION_GITAMA = 'Gitama'
     _SECTION_GOOGLE_SOURCE = 'GoogleSource'
@@ -59,33 +60,40 @@ class Configuration(configparser.ConfigParser):
     _OPTION_USER = 'User'
 
     def __init__(self, default_config_file_name: str, config_file_names: List[str]) -> None:
-        configparser.ConfigParser.__init__(self)
+        configparser.ConfigParser.__init__(self, interpolation=None)
 
         with open(default_config_file_name) as default_config_file:
             self.read_file(default_config_file)
         self.read(config_file_names)
 
-        user = self.get(Configuration._SECTION_GITAMA, Configuration._OPTION_USER)
-        url = self.get(Configuration._SECTION_GITAMA, Configuration._OPTION_URL)
-        protocol = self.get(Configuration._SECTION_GITAMA, Configuration._OPTION_PROTOCOL)
-        self._git_configuration_gitama = GitConfiguration(user, url, protocol)
+        self._default_device = self.get(Configuration._SECTION_COMMAND_LINE_DEFAULTS, Configuration._OPTION_DEVICE)
+        self._default_generic_ref = self.get(Configuration._SECTION_COMMAND_LINE_DEFAULTS,
+                                             Configuration._OPTION_GENERIC_REF)
+        self._default_name = time.strftime(self.get(Configuration._SECTION_COMMAND_LINE_DEFAULTS,
+                                                    Configuration._OPTION_NAME_FORMAT))
+        self._default_path = self.get(Configuration._SECTION_COMMAND_LINE_DEFAULTS, Configuration._OPTION_PATH)
+        self._default_project = self.get(Configuration._SECTION_COMMAND_LINE_DEFAULTS, Configuration._OPTION_PROJECT)
+        self._default_profile = self.get(Configuration._SECTION_COMMAND_LINE_DEFAULTS, Configuration._OPTION_PROFILE)
+        self._default_specific_ref = self.get(Configuration._SECTION_COMMAND_LINE_DEFAULTS,
+                                              Configuration._OPTION_SPECIFIC_REF)
 
+        protocol = self.get(Configuration._SECTION_GOOGLE_SOURCE, Configuration._OPTION_PROTOCOL)
         user = self.get(Configuration._SECTION_GOOGLE_SOURCE, Configuration._OPTION_USER)
         url = self.get(Configuration._SECTION_GOOGLE_SOURCE, Configuration._OPTION_URL)
-        protocol = self.get(Configuration._SECTION_GOOGLE_SOURCE, Configuration._OPTION_PROTOCOL)
-        self._git_configuration_google_source = GitConfiguration(user, url, protocol)
+        path = self.get(Configuration._SECTION_REPOSITORY_BUILD, Configuration._OPTION_PATH)
+        name = self.get(Configuration._SECTION_REPOSITORY_BUILD, Configuration._OPTION_NAME)
+        self._repository_build = Repository(protocol, user, url, path, name)
+
+        protocol = self.get(Configuration._SECTION_GITAMA, Configuration._OPTION_PROTOCOL)
+        user = self.get(Configuration._SECTION_GITAMA, Configuration._OPTION_USER)
+        url = self.get(Configuration._SECTION_GITAMA, Configuration._OPTION_URL)
+        path = self.get(Configuration._SECTION_REPOSITORY_LOCAL_MANIFEST, Configuration._OPTION_PATH)
+        name = self.get(Configuration._SECTION_REPOSITORY_LOCAL_MANIFEST, Configuration._OPTION_NAME)
+        self._repository_local_manifest = Repository(protocol, user, url, path, name)
 
         self._devices_names = self.get(Configuration._SECTION_DEVICES, Configuration._OPTION_LIST).split()
         self._profiles_names = self.get(Configuration._SECTION_PROFILES, Configuration._OPTION_LIST).split()
         self._projects_names = self.get(Configuration._SECTION_PROJECTS, Configuration._OPTION_LIST).split()
-
-        path = self.get(Configuration._SECTION_REPOSITORY_BUILD, Configuration._OPTION_PATH)
-        name = self.get(Configuration._SECTION_REPOSITORY_BUILD, Configuration._OPTION_NAME)
-        self._repository_build = Repository(path, name)
-
-        path = self.get(Configuration._SECTION_REPOSITORY_LOCAL_MANIFEST, Configuration._OPTION_PATH)
-        name = self.get(Configuration._SECTION_REPOSITORY_LOCAL_MANIFEST, Configuration._OPTION_NAME)
-        self._repository_local_manifest = Repository(path, name)
 
     @staticmethod
     def read_configuration() -> 'Configuration':
@@ -94,14 +102,29 @@ class Configuration(configparser.ConfigParser):
         configuration_file_names = ['config.ini']
         return Configuration(default_configuration_file_name, configuration_file_names)
 
+    def default_device(self) -> str:
+        return self._default_device
+
+    def default_generic_ref(self) -> str:
+        return self._default_generic_ref
+
+    def default_name(self) -> str:
+        return self._default_name
+
+    def default_path(self) -> str:
+        return self._default_path
+
+    def default_project(self) -> str:
+        return self._default_project
+
+    def default_profile(self) -> str:
+        return self._default_profile
+
+    def default_specific_ref(self) -> str:
+        return self._default_specific_ref
+
     def devices(self) -> List[str]:
         return self._devices_names
-
-    def git_configuration_gitama(self) -> GitConfiguration:
-        return self._git_configuration_gitama
-
-    def git_configuration_google_source(self) -> GitConfiguration:
-        return self._git_configuration_google_source
 
     def profiles(self) -> List[str]:
         return self._profiles_names
