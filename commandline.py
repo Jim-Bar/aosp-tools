@@ -42,7 +42,7 @@ class CommandLineAdapter(object):
                                     help='Android release tag (e.g. android-8.1.0_r20)',
                                     required=True)
         required_group.add_argument('-v', '--version',
-                                    help='version code (e.g. 4.0.0)',
+                                    help='version code of Xpert Eye(e.g. 4.0.0)',
                                     required=True)
 
         # Optional arguments.
@@ -56,6 +56,10 @@ class CommandLineAdapter(object):
         parser.add_argument('-n', '--name',
                             help='named prefix added to the name of the directory of the AOSP',
                             default=configuration.default_name())
+        parser.add_argument('-c', '--cores',
+                            help='number of cores to use; 0 for all cores',
+                            default=configuration.default_num_cores(),
+                            type=int)
         parser.add_argument('-w', '--path',
                             help='path to the AOSP',
                             default=configuration.default_path())
@@ -63,22 +67,47 @@ class CommandLineAdapter(object):
                             help='project',
                             choices=configuration.projects(),
                             default=configuration.default_project())
-        parser.add_argument('-u', '--profile',
+        parser.add_argument('-x', '--profile',
                             help='build profile',
                             choices=configuration.profiles(),
                             default=configuration.default_profile())
         parser.add_argument('-s', '--specific',
-                            help='specific Git ref (e.g. sailfish-8.1.0-int',
+                            help='specific Git ref (e.g. sailfish-8.1.0-int)',
                             default=configuration.default_specific_ref())
+
+        # Constant arguments.
+        parser.add_argument('-b', '--build',
+                            help='build the AOSP',
+                            action='store_true')
+        parser.add_argument('-o', '--ota',
+                            help='build OTA package',
+                            action='store_true')
+        parser.add_argument('-u', '--update',
+                            help='build update package',
+                            action='store_true')
 
         # Parse and sanity checks.
         self._args = parser.parse_args()
+        if self.num_cores() and not self.build():
+            parser.error('-c/--cores requires -a/--autobuild')
+        if self.ota_package() and not self.build():
+            parser.error('-o/--ota requires -a/--autobuild')
+        if self.update_package() and not self.build():
+            parser.error('-u/--update requires -a/--autobuild')
         android_release_tags = {tag for tag in configuration.repository_build().remote_refs()[1]
                                 if bool(re.match('^android-\d\.\d\.\d_r\d\d$', tag))}
-        assert os.path.exists(self.path())
-        assert self.release() in android_release_tags
+        if not os.path.exists(self.path()):
+            parser.error('Path {} does not exist'.format(self.path()))
+        if os.path.exists(os.path.join(self.path(), self.name())):
+            parser.error('Path {} already exists'.format(self.path()))
+        if self.release() not in android_release_tags:
+            parser.error('Android release {} does not exist'.format(self.release()))
         heads, tags = configuration.repository_local_manifest().remote_refs()
-        assert self.specific_ref() in heads or self.specific_ref() in tags
+        if self.specific_ref() not in heads and self.specific_ref() not in tags:
+            parser.error('Specific Git reference {} does not exist'.format(self.specific_ref()))
+
+    def build(self) -> bool:
+        return self._args.build
 
     def device(self) -> str:
         return self._args.device
@@ -88,6 +117,12 @@ class CommandLineAdapter(object):
 
     def name(self) -> str:
         return self._args.name
+
+    def num_cores(self) -> int:
+        return self._args.cores
+
+    def ota_package(self) -> bool:
+        return self._args.ota
 
     def path(self) -> str:
         return os.path.realpath(self._args.path)
@@ -103,6 +138,9 @@ class CommandLineAdapter(object):
 
     def specific_ref(self) -> str:
         return self._args.specific
+
+    def update_package(self) -> bool:
+        return self._args.update
 
     def version(self) -> str:
         return self._args.version

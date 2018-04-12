@@ -31,7 +31,7 @@ import time
 
 class ADBAdapter(object):
     """
-    Provides utility functions for running ADB commands.
+    Provides utility functions for issuing ADB commands.
     """
 
     _ADB = 'adb'

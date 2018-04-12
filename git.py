@@ -136,7 +136,7 @@ class Repository(object):
         self._path = path
         self._name = name
 
-    def _get_remote_url(self) -> str:
+    def get_remote_url(self) -> str:
         if self._protocol == 'file':
             return 'file://{}/{}/{}'.format(self._remote, self._path, self._name)
         elif self._protocol == 'ssh':
@@ -147,4 +147,4 @@ class Repository(object):
             return 'https://{}/{}/{}'.format(self._remote, self._path, self._name)
 
     def remote_refs(self) -> Tuple[List[str], List[str]]:
-        return _GitUtils.remote_refs(self._get_remote_url())
+        return _GitUtils.remote_refs(self.get_remote_url())
