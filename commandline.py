@@ -34,16 +34,19 @@ from configuration import Configuration
 
 class CommandLineAdapter(object):
     def __init__(self, configuration: Configuration) -> None:
-        parser = argparse.ArgumentParser(description='Clone, build and flash an AOSP')
+        parser = argparse.ArgumentParser(description='Clone, build and flash an AOSP',
+                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
         # Required arguments.
         required_group = parser.add_argument_group('required arguments')
         required_group.add_argument('-r', '--release',
                                     help='Android release tag (e.g. android-8.1.0_r20)',
-                                    required=True)
+                                    required=True,
+                                    default=argparse.SUPPRESS)
         required_group.add_argument('-v', '--version',
-                                    help='version code of Xpert Eye (e.g. 4.0.0)',
-                                    required=True)
+                                    help='version code of XpertEye (e.g. 4.0.0)',
+                                    required=True,
+                                    default=argparse.SUPPRESS)
 
         # Optional arguments.
         parser.add_argument('-d', '--device',
@@ -64,7 +67,7 @@ class CommandLineAdapter(object):
                             help='path to the AOSP',
                             default=configuration.default_path())
         parser.add_argument('-p', '--project',
-                            help='project',
+                            help='project of XpertEye',
                             choices=configuration.projects(),
                             default=configuration.default_project())
         parser.add_argument('-x', '--variant',
@@ -80,20 +83,16 @@ class CommandLineAdapter(object):
                             help='build the AOSP',
                             action='store_true')
         parser.add_argument('-o', '--ota',
-                            help='build OTA package',
+                            help='build the OTA package',
                             action='store_true')
         parser.add_argument('-u', '--update',
-                            help='build update package',
+                            help='build the update package',
                             action='store_true')
 
         # Parse and sanity checks.
         self._args = parser.parse_args()
-        if self.num_cores() and not self.build():
-            parser.error('-c/--cores requires -a/--autobuild')
-        if self.ota_package() and not self.build():
-            parser.error('-o/--ota requires -a/--autobuild')
-        if self.update_package() and not self.build():
-            parser.error('-u/--update requires -a/--autobuild')
+        if self.num_cores() and not self.build() and not self.ota_package() and not self.update_package():
+            parser.error('-c/--cores requires -b/--build or -o/--ota or -u/--update')
         android_release_tags = {tag for tag in configuration.repository_build().remote_refs()[1]
                                 if bool(re.match('^android-\d\.\d\.\d_r\d\d$', tag))}
         if not os.path.exists(self.path()):

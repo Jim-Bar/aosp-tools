@@ -26,6 +26,7 @@
 #
 
 import os
+import subprocess
 import sys
 
 from commandline import CommandLineAdapter
@@ -119,9 +120,6 @@ class AOSP(object):
     Clone, build and flash an Android Open Source Project.
     """
 
-    _LOCAL_MANIFEST_DIR = 'local_manifests'
-    _LOCAL_MANIFEST_NAME = 'local_manifest.xml'
-
     def __init__(self, environment: AOSPEnvironment) -> None:
         self._environment = environment
         print(environment)  # FIXME: Move/Remove.
@@ -133,6 +131,8 @@ class AOSP(object):
         self._create(configuration, build_options)
         self._fetch_manifest(configuration)
         self._fetch_local_manifest(configuration)
+        RepoAdapter.sync()
+        self._setup_ccache(configuration)
 
     def _create(self, configuration: Configuration, build_options: BuildOptions) -> None:
         if not os.path.exists(configuration.ccache_path()):
@@ -156,11 +156,12 @@ class AOSP(object):
             source_env_file.write(' '.join(self._source_env_setup_cmd()))
 
     def _fetch_local_manifest(self, configuration: Configuration) -> None:
-        configuration.repository_local_manifest().clone(RepoAdapter.INSTALL_DIRECTORY, AOSP._LOCAL_MANIFEST_DIR)
+        configuration.repository_local_manifest().clone(RepoAdapter.INSTALL_DIRECTORY,
+                                                        configuration.local_manifest_directory())
         configuration.repository_local_manifest().checkout(self._environment.specific_ref())
 
-        local_manifest_path = os.path.join(RepoAdapter.INSTALL_DIRECTORY, AOSP._LOCAL_MANIFEST_DIR,
-                                           AOSP._LOCAL_MANIFEST_NAME)
+        local_manifest_path = os.path.join(RepoAdapter.INSTALL_DIRECTORY, configuration.local_manifest_directory(),
+                                           configuration.local_manifest_file())
         with open(local_manifest_path) as local_manifest_file:
             local_manifest_content = local_manifest_file.read()
 
@@ -194,6 +195,11 @@ class AOSP(object):
         }
 
         return variables
+
+    @staticmethod
+    def _setup_ccache(configuration: Configuration) -> None:
+        if len(next(os.walk(configuration.ccache_path()))) == 0:  # If there are no files, CCache is not set up yet.
+            subprocess.check_call([configuration.ccache_binary_path(), '-M', '50G'])
 
     def _source_env_setup_cmd(self) -> List[str]:
         return ['.', os.path.join(self._environment.path(), 'build/envsetup.sh')]

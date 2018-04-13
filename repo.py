@@ -40,7 +40,7 @@ class RepoAdapter(object):
     _REPO = 'repo'
 
     @staticmethod
-    def init(url: str, ref: str='', component_groups: List[str]=list()):
+    def init(url: str, ref: str='', component_groups: List[str]=list()) -> None:
         cmd = [RepoAdapter._REPO, 'init', '-u', url]
         if ref:
             cmd.extend(['-b', ref])
@@ -57,3 +57,7 @@ class RepoAdapter(object):
             pass
         except FileNotFoundError:
             raise RuntimeError('Missing {}'.format(RepoAdapter._REPO))
+
+    @staticmethod
+    def sync() -> None:
+        subprocess.check_call([RepoAdapter._REPO, 'sync'])

@@ -52,11 +52,14 @@ class Configuration(configparser.ConfigParser):
     _SECTION_REPOSITORY_LOCAL_MANIFEST = 'RepositoryLocalManifest'
     _SECTION_REPOSITORY_MANIFEST = 'RepositoryManifest'
 
+    _OPTION_BINARY_PATH = 'BinaryPath'
     _OPTION_DEVICE = 'Device'
     _OPTION_FINAL_OUTPUT_DIR_NAME = 'FinalOutputDirName'
     _OPTION_GENERIC_REF = 'GenericRef'
     _OPTION_GROUPS = 'Groups'
     _OPTION_LIST = 'List'
+    _OPTION_LOCAL_MANIFEST_DIR_NAME = 'LocalManifestDirName'
+    _OPTION_LOCAL_MANIFEST_FILE_NAME = 'LocalManifestFileName'
     _OPTION_NAME = 'Name'
     _OPTION_NAME_FORMAT = 'NameFormat'
     _OPTION_NUM_CORES = 'NumCores'
@@ -111,12 +114,17 @@ class Configuration(configparser.ConfigParser):
         name = self.get(Configuration._SECTION_REPOSITORY_MANIFEST, Configuration._OPTION_NAME)
         self._repository_manifest = Repository(protocol, user, url, path, name)
 
+        self._ccache_bin_path = self.get(Configuration._SECTION_CCACHE, Configuration._OPTION_BINARY_PATH)
         self._ccache_path = self.get(Configuration._SECTION_CCACHE, Configuration._OPTION_PATH)
         self._devices_names = self.get(Configuration._SECTION_DEVICES, Configuration._OPTION_LIST).split()
         self._final_output_dir = self.get(Configuration._SECTION_AOSP_FILES,
                                           Configuration._OPTION_FINAL_OUTPUT_DIR_NAME)
         self._java_7_path = self.get(Configuration._SECTION_JAVA_7, Configuration._OPTION_PATH)
         self._java_8_path = self.get(Configuration._SECTION_JAVA_8, Configuration._OPTION_PATH)
+        self._local_manifest_dir = self.get(Configuration._SECTION_AOSP_FILES,
+                                            Configuration._OPTION_LOCAL_MANIFEST_DIR_NAME)
+        self._local_manifest_file = self.get(Configuration._SECTION_AOSP_FILES,
+                                             Configuration._OPTION_LOCAL_MANIFEST_FILE_NAME)
         self._profiles_names = self.get(Configuration._SECTION_PROFILES, Configuration._OPTION_LIST).split()
         self._projects_names = self.get(Configuration._SECTION_PROJECTS, Configuration._OPTION_LIST).split()
         self._repo_groups = self.get(Configuration._SECTION_REPO, Configuration._OPTION_GROUPS).split()
@@ -129,6 +137,9 @@ class Configuration(configparser.ConfigParser):
         default_configuration_file_name = 'default_config.ini'
         configuration_file_names = ['config.ini']
         return Configuration(default_configuration_file_name, configuration_file_names)
+
+    def ccache_binary_path(self) -> str:
+        return self._ccache_bin_path
 
     def ccache_path(self) -> str:
         return self._ccache_path
@@ -170,6 +181,12 @@ class Configuration(configparser.ConfigParser):
             return self._java_8_path
         else:
             raise ValueError('Invalid Java version: {}'.format(java_version))
+
+    def local_manifest_directory(self) -> str:
+        return self._local_manifest_dir
+
+    def local_manifest_file(self) -> str:
+        return self._local_manifest_file
 
     def profiles(self) -> List[str]:
         return self._profiles_names
