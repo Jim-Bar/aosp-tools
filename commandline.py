@@ -42,12 +42,12 @@ class CommandLineAdapter(object):
                                     help='Android release tag (e.g. android-8.1.0_r20)',
                                     required=True)
         required_group.add_argument('-v', '--version',
-                                    help='version code of Xpert Eye(e.g. 4.0.0)',
+                                    help='version code of Xpert Eye (e.g. 4.0.0)',
                                     required=True)
 
         # Optional arguments.
         parser.add_argument('-d', '--device',
-                            help='device name',
+                            help='device code name',
                             choices=configuration.devices(),
                             default=configuration.default_device())
         parser.add_argument('-g', '--generic',
@@ -67,8 +67,8 @@ class CommandLineAdapter(object):
                             help='project',
                             choices=configuration.projects(),
                             default=configuration.default_project())
-        parser.add_argument('-x', '--profile',
-                            help='build profile',
+        parser.add_argument('-x', '--variant',
+                            help='build variant',
                             choices=configuration.profiles(),
                             default=configuration.default_profile())
         parser.add_argument('-s', '--specific',
@@ -130,8 +130,8 @@ class CommandLineAdapter(object):
     def project(self) -> str:
         return self._args.project
 
-    def profile(self) -> str:
-        return self._args.profile
+    def variant(self) -> str:
+        return self._args.variant
 
     def release(self) -> str:
         return self._args.release

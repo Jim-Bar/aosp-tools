@@ -47,6 +47,7 @@ class Configuration(configparser.ConfigParser):
     _SECTION_JAVA_8 = 'Java8'
     _SECTION_PROFILES = 'Profiles'
     _SECTION_PROJECTS = 'Projects'
+    _SECTION_REPO = 'Repo'
     _SECTION_REPOSITORY_BUILD = 'RepositoryBuild'
     _SECTION_REPOSITORY_LOCAL_MANIFEST = 'RepositoryLocalManifest'
     _SECTION_REPOSITORY_MANIFEST = 'RepositoryManifest'
@@ -54,6 +55,7 @@ class Configuration(configparser.ConfigParser):
     _OPTION_DEVICE = 'Device'
     _OPTION_FINAL_OUTPUT_DIR_NAME = 'FinalOutputDirName'
     _OPTION_GENERIC_REF = 'GenericRef'
+    _OPTION_GROUPS = 'Groups'
     _OPTION_LIST = 'List'
     _OPTION_NAME = 'Name'
     _OPTION_NAME_FORMAT = 'NameFormat'
@@ -64,6 +66,7 @@ class Configuration(configparser.ConfigParser):
     _OPTION_PROTOCOL = 'Protocol'
     _OPTION_SOURCE_ENV_FILE_NAME = 'SourceEnvFileName'
     _OPTION_SPECIFIC_REF = 'SpecificRef'
+    _OPTION_TRACE = 'Trace'
     _OPTION_URL = 'Url'
     _OPTION_USER = 'User'
 
@@ -116,6 +119,8 @@ class Configuration(configparser.ConfigParser):
         self._java_8_path = self.get(Configuration._SECTION_JAVA_8, Configuration._OPTION_PATH)
         self._profiles_names = self.get(Configuration._SECTION_PROFILES, Configuration._OPTION_LIST).split()
         self._projects_names = self.get(Configuration._SECTION_PROJECTS, Configuration._OPTION_LIST).split()
+        self._repo_groups = self.get(Configuration._SECTION_REPO, Configuration._OPTION_GROUPS).split()
+        self._repo_trace = self.getboolean(Configuration._SECTION_REPO, Configuration._OPTION_TRACE)
         self._source_env_file = self.get(Configuration._SECTION_AOSP_FILES, Configuration._OPTION_SOURCE_ENV_FILE_NAME)
 
     @staticmethod
@@ -171,6 +176,12 @@ class Configuration(configparser.ConfigParser):
 
     def projects(self) -> List[str]:
         return self._projects_names
+
+    def repo_groups(self) -> List[str]:
+        return self._repo_groups
+
+    def repo_trace(self) -> List[str]:
+        return self._repo_trace
 
     def repository_build(self) -> Repository:
         return self._repository_build

@@ -48,8 +48,10 @@ class _GitUtils(object):
         subprocess.check_call(git_checkout_command, cwd=working_directory)
 
     @staticmethod
-    def clone(working_directory: str, remote_url: str) -> None:
+    def clone(working_directory: str, remote_url: str, directory_name: str='') -> None:
         git_clone_command = ['git', 'clone', remote_url]
+        if directory_name:
+            git_clone_command.append(directory_name)
         subprocess.check_call(git_clone_command, cwd=working_directory)
 
     @staticmethod
@@ -135,6 +137,9 @@ class Repository(object):
         self._remote = remote
         self._path = path
         self._name = name
+
+    def clone(self, working_directory: str, directory_name: str='') -> None:
+        _GitUtils.clone(working_directory, self.get_remote_url(), directory_name)
 
     def get_remote_url(self) -> str:
         if self._protocol == 'file':

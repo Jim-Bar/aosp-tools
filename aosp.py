@@ -26,7 +26,6 @@
 #
 
 import os
-import subprocess
 import sys
 
 from commandline import CommandLineAdapter
@@ -60,11 +59,11 @@ class AOSPEnvironment(object):
     All the characteristics of an Android Open Source Project.
     """
 
-    def __init__(self, path: str, prefix: str, release: str, profile: str, device: str, specific_ref: str,
+    def __init__(self, path: str, prefix: str, release: str, variant: str, device: str, specific_ref: str,
                  generic_ref: str, version: str, project: str) -> None:
-        self._path = os.path.join(os.path.realpath(path), '{}_{}_{}_{}'.format(prefix, release, profile, device))
+        self._path = os.path.join(os.path.realpath(path), '{}_{}_{}_{}'.format(prefix, release, variant, device))
         self._release = release
-        self._profile = profile
+        self._variant = variant
         self._device = device
         self._specific_ref = specific_ref
         self._generic_ref = generic_ref
@@ -83,7 +82,7 @@ class AOSPEnvironment(object):
         description = ''
         description += 'Path: {}\n'.format(self._path)
         description += 'Release: {}\n'.format(self._release)
-        description += 'Profile: {}\n'.format(self._profile)
+        description += 'Variant: {}\n'.format(self._variant)
         description += 'Device: {}\n'.format(self._device)
         description += 'Java version: {}\n'.format(self._java_version)
         description += 'Version: {}\n'.format(self._version)
@@ -124,6 +123,7 @@ class AOSP(object):
     def clone(self, configuration: Configuration, build_options: BuildOptions) -> None:
         self._create(configuration, build_options)
         self._fetch_manifest(configuration)
+        self._fetch_local_manifest(configuration)
 
     def _create(self, configuration: Configuration, build_options: BuildOptions) -> None:
         if not os.path.exists(configuration.ccache_path()):
@@ -146,16 +146,19 @@ class AOSP(object):
             # The AOSP's environment variables.
             source_env_file.write(' '.join(self._source_env_setup_cmd()))
 
+    def _fetch_local_manifest(self, configuration: Configuration) -> None:
+        configuration.repository_local_manifest().clone(RepoAdapter.INSTALL_DIRECTORY, 'local_manifests')
+
     def _fetch_manifest(self, configuration: Configuration) -> None:
-        subprocess.check_call(['repo', 'init', '-u', configuration.repository_manifest().get_remote_url(), '-b',
-                               self._environment.release(), '-g', 'all,tools,default'])
+        RepoAdapter.init(configuration.repository_manifest().get_remote_url(), self._environment.release(),
+                         configuration.repo_groups())
 
     def _environment_variables(self, configuration: Configuration, java_home: str, num_cores: int) -> dict:
         variables = {
             'CCACHE_DIR': configuration.ccache_path(),
             'JAVA_HOME': java_home,
             'NBCORE': num_cores,
-            'REPO_TRACE': 1,
+            'REPO_TRACE': 1 if configuration.repo_trace() else 0,
             'USE_CCACHE_DIR': 1 if configuration.ccache_path() else 0,
             'WEBUI_IMAGE_VERSION': self._environment.release(),
             'WEBUI_PLATFORM': self._environment.project(),
@@ -171,7 +174,7 @@ class AOSP(object):
 def main():
     configuration = Configuration.read_configuration()
     cli = CommandLineAdapter(configuration)
-    aosp = AOSP(AOSPEnvironment(cli.path(), cli.name(), cli.release(), cli.profile(), cli.device(), cli.specific_ref(),
+    aosp = AOSP(AOSPEnvironment(cli.path(), cli.name(), cli.release(), cli.variant(), cli.device(), cli.specific_ref(),
                                 cli.generic_ref(), cli.version(), cli.project()))
     aosp.clone(configuration, BuildOptions(cli.num_cores(), cli.ota_package(), cli.update_package()))
     aosp.build()
