@@ -92,6 +92,9 @@ class AOSPEnvironment(object):
 
         return description
 
+    def generic_ref(self) -> str:
+        return self._generic_ref
+
     def java_version(self) -> int:
         return self._java_version
 
@@ -104,6 +107,9 @@ class AOSPEnvironment(object):
     def release(self) -> str:
         return self._release
 
+    def specific_ref(self) -> str:
+        return self._specific_ref
+
     def version(self) -> str:
         return self._version
 
@@ -112,6 +118,9 @@ class AOSP(object):
     """
     Clone, build and flash an Android Open Source Project.
     """
+
+    _LOCAL_MANIFEST_DIR = 'local_manifests'
+    _LOCAL_MANIFEST_NAME = 'local_manifest.xml'
 
     def __init__(self, environment: AOSPEnvironment) -> None:
         self._environment = environment
@@ -147,7 +156,26 @@ class AOSP(object):
             source_env_file.write(' '.join(self._source_env_setup_cmd()))
 
     def _fetch_local_manifest(self, configuration: Configuration) -> None:
-        configuration.repository_local_manifest().clone(RepoAdapter.INSTALL_DIRECTORY, 'local_manifests')
+        configuration.repository_local_manifest().clone(RepoAdapter.INSTALL_DIRECTORY, AOSP._LOCAL_MANIFEST_DIR)
+        configuration.repository_local_manifest().checkout(self._environment.specific_ref())
+
+        local_manifest_path = os.path.join(RepoAdapter.INSTALL_DIRECTORY, AOSP._LOCAL_MANIFEST_DIR,
+                                           AOSP._LOCAL_MANIFEST_NAME)
+        with open(local_manifest_path) as local_manifest_file:
+            local_manifest_content = local_manifest_file.read()
+
+        tags = configuration.repository_local_manifest().get_tags()
+        if self._environment.specific_ref() in tags:
+            ref_type = 'tags'
+        else:
+            ref_type = 'heads'
+
+        local_manifest_content = local_manifest_content.replace('@TYPE@', ref_type)
+        local_manifest_content = local_manifest_content.replace('@GENERIC_VERSION@', self._environment.generic_ref())
+        local_manifest_content = local_manifest_content.replace('@SPECIFIC_VERSION@', self._environment.specific_ref())
+
+        with open(local_manifest_path, 'w') as local_manifest_file:
+            local_manifest_file.write(local_manifest_content)
 
     def _fetch_manifest(self, configuration: Configuration) -> None:
         RepoAdapter.init(configuration.repository_manifest().get_remote_url(), self._environment.release(),

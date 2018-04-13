@@ -74,6 +74,24 @@ class _GitUtils(object):
         subprocess.check_call(git_fetch_command, cwd=working_directory)
 
     @staticmethod
+    def get_branches(working_directory: str, show_remotes: bool=False) -> List[str]:
+        git_branch_command = ['git', 'branch']
+        if show_remotes:
+            git_branch_command.append('-a')
+
+        # Local branches have the structure ``* branch_name`` or ``  other_branch_name``.
+        # Remote branches have the structure ``  remotes/origin/branch_name``.
+        # When requesting remote branches, the HEAD is also included: ``  remotes/origin/HEAD -> origin/branch_name``.
+        branches_raw = subprocess.check_output(git_branch_command, cwd=working_directory).decode()
+        return [branch_raw.split()[1] for branch_raw in branches_raw if 'HEAD' not in branch_raw]
+
+    @staticmethod
+    def get_tags(working_directory: str) -> List[str]:
+        git_tag_command = ['git', 'tag']
+
+        return subprocess.check_output(git_tag_command, cwd=working_directory).decode().splitlines()
+
+    @staticmethod
     def remote_refs(remote_url: str) -> Tuple[List[str], List[str]]:
         # Get the references from the repository (the repository is not cloned).
         git_ls_remote_command = ['git', 'ls-remote', remote_url]
@@ -132,14 +150,31 @@ class Repository(object):
     """
 
     def __init__(self, protocol: str, user: str, remote: str, path: str, name: str) -> None:
+        self._clone_path = ''
         self._protocol = protocol
         self._user = user
         self._remote = remote
         self._path = path
         self._name = name
 
+    def checkout(self, ref: str) -> None:
+        self._check_cloned()
+
+        _GitUtils.checkout(ref, self._clone_path)
+
     def clone(self, working_directory: str, directory_name: str='') -> None:
         _GitUtils.clone(working_directory, self.get_remote_url(), directory_name)
+        self._clone_path = os.path.realpath(os.path.join(working_directory, directory_name))
+
+    def get_branches(self, show_remotes: bool=False) -> List[str]:
+        self._check_cloned()
+
+        return _GitUtils.get_branches(self._clone_path, show_remotes)
+
+    def get_tags(self) -> List[str]:
+        self._check_cloned()
+
+        return _GitUtils.get_tags(self._clone_path)
 
     def get_remote_url(self) -> str:
         if self._protocol == 'file':
@@ -153,3 +188,7 @@ class Repository(object):
 
     def remote_refs(self) -> Tuple[List[str], List[str]]:
         return _GitUtils.remote_refs(self.get_remote_url())
+
+    def _check_cloned(self) -> None:
+        if not self._clone_path:
+            raise RuntimeError('The repository {} is not cloned'.format(self.get_remote_url()))
