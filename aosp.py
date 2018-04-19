@@ -36,6 +36,7 @@ import tempfile
 
 from commandline import CommandLineAdapter
 from configuration import Configuration
+from manifest import LocalManifest
 from repo import RepoAdapter
 from typing import List
 
@@ -244,29 +245,12 @@ class AOSP(object):
                         self._delivery_directory(configuration))
 
     def _fetch_local_manifest(self, configuration: Configuration) -> None:
-        # TODO: Export to another script localmanifest.py which clones / generates the local manifest based on command
-        # TODO: line arguments and can be ran in standalone as well.
-        configuration.repository_local_manifest().clone(RepoAdapter.INSTALL_DIRECTORY,
-                                                        configuration.local_manifest_directory())
-        configuration.repository_local_manifest().checkout(self._environment.specific_ref())
+        local_manifest_path = os.path.join(RepoAdapter.INSTALL_DIRECTORY, configuration.local_manifest_directory())
+        os.mkdir(local_manifest_path)
 
-        local_manifest_path = os.path.join(RepoAdapter.INSTALL_DIRECTORY, configuration.local_manifest_directory(),
-                                           configuration.local_manifest_file())
-        with open(local_manifest_path) as local_manifest_file:
-            local_manifest_content = local_manifest_file.read()
-
-        tags = configuration.repository_local_manifest().get_tags()
-        if self._environment.specific_ref() in tags:
-            ref_type = 'tags'
-        else:
-            ref_type = 'heads'
-
-        local_manifest_content = local_manifest_content.replace('@TYPE@', ref_type)
-        local_manifest_content = local_manifest_content.replace('@GENERIC_VERSION@', self._environment.generic_ref())
-        local_manifest_content = local_manifest_content.replace('@SPECIFIC_VERSION@', self._environment.specific_ref())
-
-        with open(local_manifest_path, 'w') as local_manifest_file:
-            local_manifest_file.write(local_manifest_content)
+        local_manifest = LocalManifest.from_revisions(configuration, self._environment.generic_ref(),
+                                                      self._environment.specific_ref())
+        local_manifest.to_file(os.path.join(local_manifest_path, configuration.local_manifest_file()))
 
     def _fetch_manifest(self, configuration: Configuration) -> None:
         RepoAdapter.init(configuration.repository_manifest().get_remote_url(), self._environment.release(),
