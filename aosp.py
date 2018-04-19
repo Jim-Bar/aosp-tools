@@ -167,7 +167,7 @@ class AOSP(object):
         self._export_built_files_to_delivery_directory(configuration)
         self._export_firmwares_files_to_delivery_directory(configuration)
         self._compute_hashes(configuration)
-        self._export_flash_script()
+        self._export_flash_script(configuration)
 
     def _compute_hashes(self, configuration: Configuration) -> None:
         for file_name in os.listdir(self._delivery_directory(configuration)):
@@ -176,7 +176,8 @@ class AOSP(object):
                     hash_file_name = os.path.join(self._delivery_directory(configuration), '{}.md5'.format(file_name))
                     with open(hash_file_name, 'x') as hash_file:
                         hash_file.write(hashlib.md5(hashed_file.read()).hexdigest())
-                    hash_file_name = os.path.join(self._delivery_directory(configuration), '{}.sha512'.format(file_name))
+                    hash_file_name = os.path.join(self._delivery_directory(configuration),
+                                                  '{}.sha512'.format(file_name))
                     with open(hash_file_name, 'x') as hash_file:
                         hash_file.write(hashlib.sha512(hashed_file.read()).hexdigest())
 
@@ -234,8 +235,12 @@ class AOSP(object):
                 if file_name.split('.').pop() == 'img':
                     shutil.move(os.path.join(temp_directory, file_name), self._delivery_directory(configuration))
 
-    def _export_flash_script(self) -> None:
-        pass  # TODO: do.
+    def _export_flash_script(self, configuration: Configuration) -> None:
+        with tempfile.TemporaryDirectory() as temp_directory:
+            configuration.repository_system_scripts_tools().clone(os.path.dirname(temp_directory),
+                                                                  os.path.basename(temp_directory))
+            shutil.move(os.path.join(temp_directory, configuration.flash_script_path()),
+                        self._delivery_directory(configuration))
 
     def _fetch_local_manifest(self, configuration: Configuration) -> None:
         # TODO: Export to another script localmanifest.py which clones / generates the local manifest based on command

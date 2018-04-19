@@ -41,6 +41,7 @@ class Configuration(configparser.ConfigParser):
     _SECTION_COMMAND_LINE_DEFAULTS = 'CommandLineDefaults'
     _SECTION_CCACHE = 'CCache'
     _SECTION_DEVICES = 'Devices'
+    _SECTION_FLASH_SCRIPT = 'FlashScript'
     _SECTION_GITAMA = 'Gitama'
     _SECTION_GOOGLE_SOURCE = 'GoogleSource'
     _SECTION_JAVA_7 = 'Java7'
@@ -52,6 +53,7 @@ class Configuration(configparser.ConfigParser):
     _SECTION_REPOSITORY_FIRMWARES = 'RepositoryFirmwares'
     _SECTION_REPOSITORY_LOCAL_MANIFEST = 'RepositoryLocalManifest'
     _SECTION_REPOSITORY_MANIFEST = 'RepositoryManifest'
+    _SECTION_REPOSITORY_SYSTEM_SCRIPTS_TOOLS = 'RepositorySystemScriptsTools'
     _SECTION_SHELL = 'Shell'
 
     _OPTION_BINARY_PATH = 'BinaryPath'
@@ -125,11 +127,19 @@ class Configuration(configparser.ConfigParser):
         name = self.get(Configuration._SECTION_REPOSITORY_MANIFEST, Configuration._OPTION_NAME)
         self._repository_manifest = Repository(protocol, user, url, path, name)
 
+        protocol = self.get(Configuration._SECTION_GITAMA, Configuration._OPTION_PROTOCOL)
+        user = self.get(Configuration._SECTION_GITAMA, Configuration._OPTION_USER)
+        url = self.get(Configuration._SECTION_GITAMA, Configuration._OPTION_URL)
+        path = self.get(Configuration._SECTION_REPOSITORY_SYSTEM_SCRIPTS_TOOLS, Configuration._OPTION_PATH)
+        name = self.get(Configuration._SECTION_REPOSITORY_SYSTEM_SCRIPTS_TOOLS, Configuration._OPTION_NAME)
+        self._repository_system_scripts_tools = Repository(protocol, user, url, path, name)
+
         self._ccache_bin_path = self.get(Configuration._SECTION_CCACHE, Configuration._OPTION_BINARY_PATH)
         self._ccache_path = self.get(Configuration._SECTION_CCACHE, Configuration._OPTION_PATH)
         self._devices_names = self.get(Configuration._SECTION_DEVICES, Configuration._OPTION_LIST).split()
         self._delivery_dir = self.get(Configuration._SECTION_AOSP_FILES, Configuration._OPTION_FINAL_OUTPUT_DIR_NAME)
         self._dist_dir = self.get(Configuration._SECTION_AOSP_FILES, Configuration._OPTION_DIST_DIR_NAME)
+        self._flash_script_path = self.get(Configuration._SECTION_FLASH_SCRIPT, Configuration._OPTION_PATH)
         self._include_in_delivery = self.get(Configuration._SECTION_AOSP_FILES,
                                              Configuration._OPTION_INCLUDE_IN_DELIVERY).split()
         self._java_7_path = self.get(Configuration._SECTION_JAVA_7, Configuration._OPTION_PATH)
@@ -191,6 +201,9 @@ class Configuration(configparser.ConfigParser):
     def dist_directory(self) -> str:
         return self._dist_dir
 
+    def flash_script_path(self) -> str:
+        return self._flash_script_path
+
     def files_to_include_in_delivery(self) -> List[str]:
         return self._include_in_delivery
 
@@ -231,6 +244,9 @@ class Configuration(configparser.ConfigParser):
 
     def repository_manifest(self) -> Repository:
         return self._repository_manifest
+
+    def repository_system_scripts_tools(self) -> Repository:
+        return self._repository_system_scripts_tools
 
     def shell(self) -> str:
         return self._shell
