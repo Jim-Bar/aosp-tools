@@ -49,14 +49,18 @@ class Configuration(configparser.ConfigParser):
     _SECTION_PROJECTS = 'Projects'
     _SECTION_REPO = 'Repo'
     _SECTION_REPOSITORY_BUILD = 'RepositoryBuild'
+    _SECTION_REPOSITORY_FIRMWARES = 'RepositoryFirmwares'
     _SECTION_REPOSITORY_LOCAL_MANIFEST = 'RepositoryLocalManifest'
     _SECTION_REPOSITORY_MANIFEST = 'RepositoryManifest'
+    _SECTION_SHELL = 'Shell'
 
     _OPTION_BINARY_PATH = 'BinaryPath'
     _OPTION_DEVICE = 'Device'
-    _OPTION_FINAL_OUTPUT_DIR_NAME = 'FinalOutputDirName'
+    _OPTION_DIST_DIR_NAME = 'DistDirName'
+    _OPTION_FINAL_OUTPUT_DIR_NAME = 'DeliveryDirName'
     _OPTION_GENERIC_REF = 'GenericRef'
     _OPTION_GROUPS = 'Groups'
+    _OPTION_INCLUDE_IN_DELIVERY = 'IncludeInDelivery'
     _OPTION_LIST = 'List'
     _OPTION_LOCAL_MANIFEST_DIR_NAME = 'LocalManifestDirName'
     _OPTION_LOCAL_MANIFEST_FILE_NAME = 'LocalManifestFileName'
@@ -103,6 +107,13 @@ class Configuration(configparser.ConfigParser):
         protocol = self.get(Configuration._SECTION_GITAMA, Configuration._OPTION_PROTOCOL)
         user = self.get(Configuration._SECTION_GITAMA, Configuration._OPTION_USER)
         url = self.get(Configuration._SECTION_GITAMA, Configuration._OPTION_URL)
+        path = self.get(Configuration._SECTION_REPOSITORY_FIRMWARES, Configuration._OPTION_PATH)
+        name = self.get(Configuration._SECTION_REPOSITORY_FIRMWARES, Configuration._OPTION_NAME)
+        self._repository_firmwares = Repository(protocol, user, url, path, name)
+
+        protocol = self.get(Configuration._SECTION_GITAMA, Configuration._OPTION_PROTOCOL)
+        user = self.get(Configuration._SECTION_GITAMA, Configuration._OPTION_USER)
+        url = self.get(Configuration._SECTION_GITAMA, Configuration._OPTION_URL)
         path = self.get(Configuration._SECTION_REPOSITORY_LOCAL_MANIFEST, Configuration._OPTION_PATH)
         name = self.get(Configuration._SECTION_REPOSITORY_LOCAL_MANIFEST, Configuration._OPTION_NAME)
         self._repository_local_manifest = Repository(protocol, user, url, path, name)
@@ -117,8 +128,10 @@ class Configuration(configparser.ConfigParser):
         self._ccache_bin_path = self.get(Configuration._SECTION_CCACHE, Configuration._OPTION_BINARY_PATH)
         self._ccache_path = self.get(Configuration._SECTION_CCACHE, Configuration._OPTION_PATH)
         self._devices_names = self.get(Configuration._SECTION_DEVICES, Configuration._OPTION_LIST).split()
-        self._final_output_dir = self.get(Configuration._SECTION_AOSP_FILES,
-                                          Configuration._OPTION_FINAL_OUTPUT_DIR_NAME)
+        self._delivery_dir = self.get(Configuration._SECTION_AOSP_FILES, Configuration._OPTION_FINAL_OUTPUT_DIR_NAME)
+        self._dist_dir = self.get(Configuration._SECTION_AOSP_FILES, Configuration._OPTION_DIST_DIR_NAME)
+        self._include_in_delivery = self.get(Configuration._SECTION_AOSP_FILES,
+                                             Configuration._OPTION_INCLUDE_IN_DELIVERY).split()
         self._java_7_path = self.get(Configuration._SECTION_JAVA_7, Configuration._OPTION_PATH)
         self._java_8_path = self.get(Configuration._SECTION_JAVA_8, Configuration._OPTION_PATH)
         self._local_manifest_dir = self.get(Configuration._SECTION_AOSP_FILES,
@@ -129,6 +142,7 @@ class Configuration(configparser.ConfigParser):
         self._projects_names = self.get(Configuration._SECTION_PROJECTS, Configuration._OPTION_LIST).split()
         self._repo_groups = self.get(Configuration._SECTION_REPO, Configuration._OPTION_GROUPS).split()
         self._repo_trace = self.getboolean(Configuration._SECTION_REPO, Configuration._OPTION_TRACE)
+        self._shell = self.get(Configuration._SECTION_SHELL, Configuration._OPTION_PATH)
         self._source_env_file = self.get(Configuration._SECTION_AOSP_FILES, Configuration._OPTION_SOURCE_ENV_FILE_NAME)
 
     @staticmethod
@@ -137,6 +151,9 @@ class Configuration(configparser.ConfigParser):
         default_configuration_file_name = 'default_config.ini'
         configuration_file_names = ['config.ini']
         return Configuration(default_configuration_file_name, configuration_file_names)
+
+    def base_delivery_directory(self) -> str:
+        return self._delivery_dir
 
     def ccache_binary_path(self) -> str:
         return self._ccache_bin_path
@@ -171,8 +188,11 @@ class Configuration(configparser.ConfigParser):
     def devices(self) -> List[str]:
         return self._devices_names
 
-    def final_output_directory(self) -> str:
-        return self._final_output_dir
+    def dist_directory(self) -> str:
+        return self._dist_dir
+
+    def files_to_include_in_delivery(self) -> List[str]:
+        return self._include_in_delivery
 
     def java_home(self, java_version: int) -> str:
         if java_version == 7:
@@ -203,11 +223,17 @@ class Configuration(configparser.ConfigParser):
     def repository_build(self) -> Repository:
         return self._repository_build
 
+    def repository_firmwares(self) -> Repository:
+        return self._repository_firmwares
+
     def repository_local_manifest(self) -> Repository:
         return self._repository_local_manifest
 
     def repository_manifest(self) -> Repository:
         return self._repository_manifest
+
+    def shell(self) -> str:
+        return self._shell
 
     def source_env_file_name(self) -> str:
         return self._source_env_file

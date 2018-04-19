@@ -93,6 +93,8 @@ class CommandLineAdapter(object):
         self._args = parser.parse_args()
         if self.num_cores() and not self.build() and not self.ota_package() and not self.update_package():
             parser.error('-c/--cores requires -b/--build or -o/--ota or -u/--update')
+        if self.num_cores() < 0:
+            parser.error('-c/--cores must be greater than or equal to zero')
         android_release_tags = {tag for tag in configuration.repository_build().remote_refs()[1]
                                 if bool(re.match('^android-\d\.\d\.\d_r\d\d$', tag))}
         if not os.path.exists(self.path()):
