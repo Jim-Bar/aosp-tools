@@ -86,6 +86,7 @@ class AOSPEnvironment(object):
 
     def __str__(self) -> str:
         description = ''
+        description += '{}\n'.format('=' * len('Path: {}'.format(self._path)))
         description += 'Path: {}\n'.format(self._path)
         description += 'Release: {}\n'.format(self._release)
         description += 'Variant: {}\n'.format(self._variant)
@@ -94,7 +95,8 @@ class AOSPEnvironment(object):
         description += 'Version: {}\n'.format(self._version)
         description += 'Project: {}\n'.format(self._project)
         description += 'Generic ref: {}\n'.format(self._generic_ref)
-        description += 'Specific ref: {}'.format(self._specific_ref)
+        description += 'Specific ref: {}\n'.format(self._specific_ref)
+        description += '=' * len('Path: {}'.format(self._path))
 
         return description
 
@@ -133,7 +135,6 @@ class AOSP(object):
 
     def __init__(self, environment: AOSPEnvironment) -> None:
         self._environment = environment
-        print(environment)  # FIXME: Move/Remove.
 
     def build_droid(self, configuration: Configuration, build_options: BuildOptions) -> None:
         file_content = '#!{}\n'.format(configuration.shell())
@@ -297,8 +298,16 @@ class AOSP(object):
 def main():
     configuration = Configuration.read_configuration()
     cli = CommandLineAdapter(configuration)
-    aosp = AOSP(AOSPEnvironment(cli.path(), cli.name(), cli.release(), cli.variant(), cli.device(), cli.specific_ref(),
-                                cli.generic_ref(), cli.version(), cli.project()))
+    environment = AOSPEnvironment(cli.path(), cli.name(), cli.release(), cli.variant(), cli.device(),
+                                  cli.specific_ref(), cli.generic_ref(), cli.version(), cli.project())
+    print(environment)
+    if not cli.continue_when_prompted():
+        try:
+            input('Press enter to continue...')
+        except KeyboardInterrupt:
+            print('')
+            return
+    aosp = AOSP(environment)
     options = BuildOptions(cli.num_cores(), cli.ota_package(), cli.update_package())
     aosp.clone(configuration, options)
     if cli.build():

@@ -88,11 +88,12 @@ class CommandLineAdapter(object):
         parser.add_argument('-u', '--update',
                             help='build the update package',
                             action='store_true')
+        parser.add_argument('-y', '--yes',
+                            help='automatically continue when prompted',
+                            action='store_true')
 
         # Parse and sanity checks.
         self._args = parser.parse_args()
-        if self.num_cores() and not self.build() and not self.ota_package() and not self.update_package():
-            parser.error('-c/--cores requires -b/--build or -o/--ota or -u/--update')
         if self.num_cores() < 0:
             parser.error('-c/--cores must be greater than or equal to zero')
         android_release_tags = {tag for tag in configuration.repository_build().remote_refs()[1]
@@ -109,6 +110,9 @@ class CommandLineAdapter(object):
 
     def build(self) -> bool:
         return self._args.build
+
+    def continue_when_prompted(self) -> bool:
+        return self._args.yes
 
     def device(self) -> str:
         return self._args.device
