@@ -34,7 +34,22 @@ from configuration import Configuration
 from typing import List
 
 
-class _LocalManifestRemote(object):
+class LocalManifestRef(object):
+    def __init__(self, name: str, type_name: str) -> None:
+        self._name = name
+        self._is_tag = type_name == 'tag'
+
+    def is_tag(self) -> bool:
+        return self._is_tag
+
+    def name(self) -> str:
+        return self._name
+
+    def type(self) -> str:
+        return 'tag' if self._is_tag else 'head'
+
+
+class LocalManifestRemote(object):
     def __init__(self, name: str, path: str) -> None:
         self._name = name
         self._path = path
@@ -46,8 +61,8 @@ class _LocalManifestRemote(object):
         return self._path
 
 
-class _LocalManifestProject(object):
-    def __init__(self, name: str, path: str, remote: _LocalManifestRemote, groups: str, ref_type: str, ref_name: str,
+class LocalManifestProject(object):
+    def __init__(self, name: str, path: str, remote: LocalManifestRemote, groups: List[str], ref: LocalManifestRef,
                  override: bool, children: List[xml.etree.ElementTree.Element]) -> None:
         self._children = children
         self._groups = groups
@@ -55,13 +70,12 @@ class _LocalManifestProject(object):
         self._override = override
         self._path = path
         self._remote = remote
-        self._ref_name = ref_name
-        self._ref_type = ref_type
+        self._ref = ref
 
     def children(self) -> List[xml.etree.ElementTree.Element]:
         return self._children
 
-    def groups(self) -> str:
+    def groups(self) -> List[str]:
         return self._groups
 
     def name(self) -> str:
@@ -73,20 +87,19 @@ class _LocalManifestProject(object):
     def path(self) -> str:
         return self._path
 
-    def remote(self) -> _LocalManifestRemote:
+    def remote(self) -> LocalManifestRemote:
         return self._remote
 
-    def ref_name(self) -> str:
-        return self._ref_name
-
-    def ref_type(self) -> str:
-        return self._ref_type
+    def ref(self) -> LocalManifestRef:
+        return self._ref
 
 
 class LocalManifest(object):
 
-    def __init__(self, projects: List[_LocalManifestProject], remotes: List[_LocalManifestRemote]) -> None:
+    def __init__(self, projects: List[LocalManifestProject], refs: List[LocalManifestRef],
+                 remotes: List[LocalManifestRemote]) -> None:
         self._projects = projects
+        self._refs = refs
         self._remotes = remotes
 
     @staticmethod
@@ -111,6 +124,15 @@ class LocalManifest(object):
                                                                             specific_ref)
             return LocalManifest._from_string(local_manifest_content)
 
+    def projects(self) -> List[LocalManifestProject]:
+        return self._projects
+
+    def refs(self) -> List[LocalManifestRef]:
+        return self._refs
+
+    def remotes(self) -> List[LocalManifestRemote]:
+        return self._remotes
+
     def to_file(self, file_path: str) -> None:
         manifest_node = xml.etree.ElementTree.Element('manifest')
 
@@ -134,10 +156,10 @@ class LocalManifest(object):
                 'name': project.name(),
                 'path': project.path(),
                 'remote': project.remote().name(),
-                'revision': 'refs/{}/{}'.format(project.ref_type(), project.ref_name())
+                'revision': 'refs/{}/{}'.format(project.ref().type(), project.ref().name())
             }
             if project.groups():
-                project_element_attributes['groups'] = project.groups()
+                project_element_attributes['groups'] = ','.join(project.groups())
             project_element = xml.etree.ElementTree.Element('project', project_element_attributes)
 
             for child in project.children():
@@ -174,11 +196,13 @@ class LocalManifest(object):
 
             removed_paths.append(path)
 
+        refs = dict()
+
         remotes = dict()
         for xml_root_child in xml_root.findall('remote'):
             remote_name = xml_root_child.attrib['name']
             remote_path = xml_root_child.attrib['fetch']
-            remotes[remote_name] = _LocalManifestRemote(remote_name, remote_path)
+            remotes[remote_name] = LocalManifestRemote(remote_name, remote_path)
 
         projects = list()
         for xml_root_child in xml_root.findall('project'):
@@ -193,12 +217,15 @@ class LocalManifest(object):
 
             # Get groups.
             try:
-                groups = xml_root_child.attrib['groups']
+                groups = xml_root_child.attrib['groups'].split(',')
             except KeyError:
                 groups = ''
 
             # Get type (branch or tag) and revision name.
             _, ref_type, ref_name = xml_root_child.attrib['revision'].split('/')
+            if ref_name not in refs:
+                refs[ref_name] = LocalManifestRef(ref_name, ref_type)
+            ref = refs[ref_name]
 
             # If the path of the repository is in the list of the removed projects' paths, this means that this
             # repository overrides another repository. Mark it as such.
@@ -209,6 +236,6 @@ class LocalManifest(object):
             for child in xml_root_child:
                 children.append(child)
 
-            projects.append(_LocalManifestProject(name, path, remote, groups, ref_type, ref_name, overrides, children))
+            projects.append(LocalManifestProject(name, path, remote, groups, ref, overrides, children))
 
-        return LocalManifest(projects, list(remotes.values()))
+        return LocalManifest(projects, list(refs.values()), list(remotes.values()))
