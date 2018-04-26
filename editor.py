@@ -41,7 +41,7 @@ class _ManifestEditorPanelCategory(urwid.Pile):
         remote_widgets = urwid.Pile([])
         for content in items:
             remote_widgets.contents.append((_ManifestEditorPanelCategory._create_content_widget(*content),
-                                            remote_widgets.options('pack', None)))
+                                            remote_widgets.options(urwid.PACK, None)))
 
         super().__init__([
             remotes_title_widget,
@@ -49,13 +49,18 @@ class _ManifestEditorPanelCategory(urwid.Pile):
             remote_widgets
         ])
 
+    def columns(self) -> int:
+        required_widths = [len(widget.contents[0][0].text) + len(widget.contents[1][0].text) + 2
+                           for widget, _ in self.contents[-1][0].contents]
+        return max(required_widths)
+
     @staticmethod
     def _create_content_widget(content: str, count: int) -> urwid.Columns:
         remote_content_widget = urwid.SelectableIcon(content, cursor_position=0)
-        remote_count_widget = urwid.Text('[{}]'.format(count), align='right')
+        remote_count_widget = urwid.Text('[{}]'.format(count), align=urwid.RIGHT)
         return urwid.Columns([
-            ('weight', 26, remote_content_widget),
-            ('weight', 3, remote_count_widget)
+            (urwid.WEIGHT, 26, remote_content_widget),
+            (urwid.WEIGHT, 3, remote_count_widget)
         ])
 
 
@@ -82,6 +87,11 @@ class _ManifestEditorPanel(urwid.Pile):
             _ManifestEditorPanelCategory('Groups', groups),
             urwid.Text(_ManifestEditorPanel._INFO)
         ])
+
+    def columns(self) -> int:
+        required_widths = [category.columns() for category, _ in self.contents
+                           if type(category) is _ManifestEditorPanelCategory]
+        return max(required_widths)
 
 
 class _ManifestEditorProjectList(urwid.Pile):
@@ -132,10 +142,12 @@ class ManifestEditor(object):
     """
 
     def __init__(self, local_manifest: manifest.LocalManifest) -> None:
-        projects = urwid.Filler(_ManifestEditorProjectList(local_manifest.projects()), 'top')
-        panel = urwid.Filler(_ManifestEditorPanel(local_manifest.projects(), local_manifest.remotes(),
-                                                  local_manifest.refs()), 'top')
-        urwid.MainLoop(urwid.Columns([projects, (50, panel)])).run()
+        projects = _ManifestEditorProjectList(local_manifest.projects())
+        panel = _ManifestEditorPanel(local_manifest.projects(), local_manifest.remotes(), local_manifest.refs())
+        urwid.MainLoop(urwid.Columns([
+            urwid.Filler(projects, urwid.TOP),
+            (panel.columns(), urwid.Filler(panel, urwid.TOP))
+        ])).run()
 
 
 if __name__ == '__main__':
