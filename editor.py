@@ -23,30 +23,87 @@
 #
 
 import configuration
+import functools
 import manifest
 import urwid
 
-from typing import Callable, Iterable, List, Set, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Set, Tuple, Union
 
 
-class _ManifestEditorPanelCategory(urwid.Pile):
+class _ToggleableText(urwid.SelectableIcon):
     """
     TODO
     """
 
-    def __init__(self, category_name: str, items: List[Tuple[str, int]]) -> None:
-        remotes_title_widget = urwid.Text(category_name)
+    def __init__(self, text: str, on_toggled: Callable[[], None]) -> None:
+        super().__init__(text, 0)
+        self._toggled = False
+        self._on_toggled = on_toggled
 
-        remotes_divider_widget = urwid.Divider()
-        remote_widgets = urwid.Pile([])
-        for content in items:
-            remote_widgets.contents.append((_ManifestEditorPanelCategory._create_content_widget(*content),
-                                            remote_widgets.options(urwid.PACK, None)))
+    def keypress(self, size, key):
+        if key == ' ':
+            self.toggle()
+            return None
+        else:
+            return super().keypress(size, key)
+
+    def toggle(self, invoke_callback=True) -> None:
+        self._toggled = not self._toggled
+        self.set_text(('toggled' if self._toggled else 'toggleable', self.text))
+        if invoke_callback:
+            self._on_toggled()
+
+    def is_toggled(self) -> bool:
+        return self._toggled
+
+
+class _PanelCategoryItem(urwid.Columns):
+    """
+    TODO
+    """
+
+    def __init__(self, first: str, second: str, formatter: Callable[[str, str], str], count: int,
+                 on_toggled: Callable[[], None]) -> None:
+        self._content_widget = _ToggleableText(formatter(first, second), on_toggled)
+        count_widget = urwid.Text('[{}]'.format(count), align=urwid.RIGHT)
+        super().__init__([
+            (urwid.WEIGHT, 26, self._content_widget),
+            (urwid.WEIGHT, 3, count_widget)
+        ])
+
+        self._first = first
+        self._second = second
+
+    def first(self) -> str:
+        return self._first
+
+    def second(self) -> str:
+        return self._second
+
+    def toggle_off(self) -> None:
+        if self._content_widget.is_toggled():
+            self._content_widget.toggle(invoke_callback=False)
+
+
+class _PanelCategory(urwid.Pile):
+    """
+    TODO
+    """
+
+    def __init__(self, category_name: str, items: List[Tuple[str, str, int]], formatter: Callable[[str, str], str],
+                 on_widget_toggled: Callable[[str], None]) -> None:
+        widget_title = urwid.Text(category_name)
+
+        divider_widget = urwid.Divider()
+        self._widgets = dict()
+        for first, second, count in items:
+            self._widgets[first] = _PanelCategoryItem(first, second, formatter, count,
+                                                      functools.partial(on_widget_toggled, first))
 
         super().__init__([
-            remotes_title_widget,
-            remotes_divider_widget,
-            remote_widgets
+            widget_title,
+            divider_widget,
+            urwid.Pile([(urwid.PACK, remote_widget) for remote_widget in self._widgets.values()])
         ])
 
     def columns(self) -> int:
@@ -54,42 +111,103 @@ class _ManifestEditorPanelCategory(urwid.Pile):
                            for widget, _ in self.contents[-1][0].contents]
         return max(required_widths)
 
-    @staticmethod
-    def _create_content_widget(content: str, count: int) -> urwid.Columns:
-        remote_content_widget = urwid.SelectableIcon(content, cursor_position=0)
-        remote_count_widget = urwid.Text('[{}]'.format(count), align=urwid.RIGHT)
-        return urwid.Columns([
-            (urwid.WEIGHT, 26, remote_content_widget),
-            (urwid.WEIGHT, 3, remote_count_widget)
-        ])
+    def get_widget(self, name: str) -> _PanelCategoryItem:
+        return self._widgets[name]
+
+    def get_widgets(self) -> Iterable[_PanelCategoryItem]:
+        return self._widgets.values()
 
 
-class _ManifestEditorPanel(urwid.Pile):
+class _Panel(urwid.Pile):
     """
     TODO
     """
 
     _INFO = '(Action: SPACE, Edit: e, Add: +, Remove: -)'
 
-    def __init__(self, groups: Set[str], remotes: List[Tuple[str, str]], revisions: List[Tuple[str, str]]) -> None:
-        groups = [(group, 0) for group in groups]
-        remotes = [('{} -> {}'.format(name, path), 0) for name, path in remotes]
-        revisions = [('{}/{}'.format(name, type_name), 0) for name, type_name in revisions]
+    def __init__(self, groups: Set[str], on_group_toggled: Callable[[str], None], remotes: List[Tuple[str, str]],
+                 on_remote_toggled: Callable[[str], None], revisions: List[Tuple[str, str]],
+                 on_revision_toggled: Callable[[str], None]) -> None:
+        groups = [(group, '', 0) for group in groups]
+        remotes = [(name, path, 0) for name, path in remotes]
+        revisions = [(name, type_name, 0) for name, type_name in revisions]
 
-        super().__init__([
-            _ManifestEditorPanelCategory('Remotes', remotes),
-            _ManifestEditorPanelCategory('Revisions', revisions),
-            _ManifestEditorPanelCategory('Groups', groups),
-            urwid.Text(_ManifestEditorPanel._INFO)
-        ])
+        self._remotes = _PanelCategory('Remotes', remotes, lambda a, b: '{} -> {}'.format(a, b), on_remote_toggled)
+        self._revisions = _PanelCategory('Revisions', revisions, lambda a, b: '{}/{}'.format(b, a), on_revision_toggled)
+        self._groups = _PanelCategory('Groups', groups, lambda a, b: a, on_group_toggled)
+        super().__init__([self._remotes, self._revisions, self._groups, urwid.Text(_Panel._INFO)])
 
     def columns(self) -> int:
         required_widths = [category.columns() for category, _ in self.contents
-                           if type(category) is _ManifestEditorPanelCategory]
+                           if type(category) is _PanelCategory]
         return max(required_widths)
 
+    def groups(self) -> _PanelCategory:
+        return self._groups
 
-class _ManifestEditorProjectList(urwid.Pile):
+    def remotes(self) -> _PanelCategory:
+        return self._remotes
+
+    def revisions(self) -> _PanelCategory:
+        return self._revisions
+
+
+class _Max(object):
+    """
+    TODO
+    """
+
+    def __init__(self, max_name: int, max_path: int, max_revision: int, max_remote: int, max_groups: int) -> None:
+        self._name = max_name
+        self._path = max_path
+        self._revision = max_revision
+        self._remote = max_remote
+        self._groups = max_groups
+
+    def name(self) -> int:
+        return self._name
+
+    def path(self) -> int:
+        return self._path
+
+    def revision(self) -> int:
+        return self._revision
+
+    def remote(self) -> int:
+        return self._remote
+
+    def groups(self) -> int:
+        return self._groups
+
+    @staticmethod
+    def max_length(projects: List[Tuple[str, str, bool, str, str, List[str]]], index: int, caption: str,
+                   func: Callable[[Iterable[str]], str]=lambda x: x) -> int:
+        return max(max(map(lambda item: len(func(item[index])), projects)), len(caption))
+
+
+class _Project(urwid.SelectableIcon):
+    """
+    TODO
+    """
+
+    def __init__(self, name: str, path: str, override: bool, revision: str, remote: str, groups: List[str],
+                 maximums: _Max) -> None:
+        self._name = name
+        self._path = path
+        self._override = override
+        self._revision = revision
+        self._remote = remote
+        self._groups = groups
+        super().__init__(self._build_text(maximums), cursor_position=0)
+
+    def _build_text(self, maximums: _Max) -> str:
+        return '{} {} {} {} {} {}'.format('*' if self._override else ' ', self._name.ljust(maximums.name()),
+                                          self._path.ljust(maximums.path()), self._revision.ljust(maximums.revision()),
+                                          self._remote.ljust(maximums.remote()),
+                                          ','.join(self._groups).ljust(maximums.groups()))
+
+
+class _ProjectList(urwid.Pile):
     """
     TODO
     """
@@ -97,35 +215,24 @@ class _ManifestEditorProjectList(urwid.Pile):
     def __init__(self, projects: List[Tuple[str, str, bool, str, str, List[str]]]) -> None:
         self._projects = dict()
 
-        self._max_name = _ManifestEditorProjectList._max_length(projects, 0, 'name')
-        self._max_path = _ManifestEditorProjectList._max_length(projects, 1, 'path')
-        self._max_revision = _ManifestEditorProjectList._max_length(projects, 3, 'revision')
-        self._max_remote = _ManifestEditorProjectList._max_length(projects, 4, 'remote')
-        self._max_groups = _ManifestEditorProjectList._max_length(projects, 5, 'groups', ','.join)
+        self._max = _Max(_Max.max_length(projects, 0, 'name'), _Max.max_length(projects, 1, 'path'),
+                         _Max.max_length(projects, 3, 'revision'), _Max.max_length(projects, 4, 'remote'),
+                         _Max.max_length(projects, 5, 'groups', ','.join))
 
         for name, path, override, revision, remote, groups in projects:
-            self._projects[name] = self._create_project_widget(name, path, override, revision, remote, groups)
+            self._projects[name] = _Project(name, path, override, revision, remote, groups, self._max)
 
         super().__init__([
-            urwid.Text('  {} {} {} {} {}'.format('name'.ljust(self._max_name, ' '), 'path'.ljust(self._max_path, ' '),
-                                                 'revision'.ljust(self._max_revision, ' '),
-                                                 'remote'.ljust(self._max_remote, ' '),
-                                                 'groups'.ljust(self._max_groups, ' '))),
+            urwid.Text('  {} {} {} {} {}'.format('name'.ljust(self._max.name(), ' '),
+                                                 'path'.ljust(self._max.path(), ' '),
+                                                 'revision'.ljust(self._max.revision(), ' '),
+                                                 'remote'.ljust(self._max.remote(), ' '),
+                                                 'groups'.ljust(self._max.groups(), ' '))),
             urwid.Pile(self._projects.values())
         ])
 
-    def _create_project_widget(self, name: str, path: str, override: bool, revision: str, remote: str,
-                               groups: List[str]) -> urwid.SelectableIcon:
-        return urwid.SelectableIcon('{} {} {} {} {} {}'
-                                    .format('*' if override else ' ', name.ljust(self._max_name, ' '),
-                                            path.ljust(self._max_path), revision.ljust(self._max_revision),
-                                            remote.ljust(self._max_remote), ','.join(groups).ljust(self._max_groups)),
-                                    cursor_position=0)
-
-    @staticmethod
-    def _max_length(projects: List[Tuple[str, str, bool, str, str, List[str]]], index: int, caption: str,
-                    func: Callable[[Iterable[str]], str]=lambda x: x) -> int:
-        return max(max(map(lambda item: len(func(item[index])), projects)), len(caption))
+    def projects(self) -> Dict[str, _Project]:
+        return self._projects
 
 
 class _GUI(object):
@@ -135,15 +242,36 @@ class _GUI(object):
 
     def __init__(self, projects: List[Tuple[str, str, bool, str, str, List[str]]], remotes: List[Tuple[str, str]],
                  revisions: List[Tuple[str, str]]) -> None:
-        projects_widget = _ManifestEditorProjectList(projects)
+        self._projects_widget = _ProjectList(projects)
         groups = set()
         for project in projects:
             groups.update(project[-1])
-        panel = _ManifestEditorPanel(groups, revisions, remotes)
+        self._panel = _Panel(groups, self._on_group_toggled, remotes, self._on_remote_toggled, revisions,
+                             self._on_revision_toggled)
+
+        palette = [
+            ('toggleable', 'default', 'default'),
+            ('toggled', 'standout', 'default')
+        ]
+
         urwid.MainLoop(urwid.Columns([
-            urwid.Filler(projects_widget, urwid.TOP),
-            (panel.columns(), urwid.Filler(panel, urwid.TOP))
-        ])).run()
+            urwid.Filler(self._projects_widget, urwid.TOP),
+            (self._panel.columns(), urwid.Filler(self._panel, urwid.TOP))
+        ]), palette).run()
+
+    # TODO: Maybe return a bool for validating or not the fact that the widget has been toggled.
+    def _on_remote_toggled(self, remote_name: str) -> None:
+        for remote in self._panel.remotes().get_widgets():
+            if remote_name != remote.first():
+                remote.toggle_off()
+
+    def _on_revision_toggled(self, revision_name: str) -> None:
+        for revision in self._panel.revisions().get_widgets():
+            if revision_name != revision.first():
+                revision.toggle_off()
+
+    def _on_group_toggled(self, group_name: str) -> None:
+        pass  # Nothing to do, several groups can be selected at once.
 
 
 class ManifestEditor(object):
