@@ -22,12 +22,13 @@
 # in all copies of this file.
 #
 
+import collections
 import configuration
 import functools
 import manifest
 import urwid
 
-from typing import Callable, Dict, Iterable, List, Set, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Tuple, Union
 
 
 class _ToggleableText(urwid.SelectableIcon):
@@ -35,26 +36,26 @@ class _ToggleableText(urwid.SelectableIcon):
     TODO
     """
 
-    def __init__(self, text: str, on_toggled: Callable[[], None]) -> None:
-        super().__init__(text, 0)
-        self._toggled = False
-        self._on_toggled = on_toggled
+    def __init__(self, text: str, is_toggled: bool, on_toggle: Callable[[bool], bool]) -> None:
+        self._toggled = is_toggled
+        self._on_toggled = on_toggle
+        super().__init__(('toggled' if self._toggled else 'toggleable', text), 0)
 
     def keypress(self, size, key):
         if key == ' ':
-            self.toggle()
+            self._toggle()
             return None
         else:
             return super().keypress(size, key)
 
-    def toggle(self, invoke_callback=True) -> None:
-        self._toggled = not self._toggled
-        self.set_text(('toggled' if self._toggled else 'toggleable', self.text))
-        if invoke_callback:
-            self._on_toggled()
+    def toggle_off(self) -> None:
+        self._toggled = False
+        self.set_text(('toggleable', self.text))
 
-    def is_toggled(self) -> bool:
-        return self._toggled
+    def _toggle(self) -> None:
+        if self._on_toggled(not self._toggled):
+            self._toggled = not self._toggled
+            self.set_text(('toggled' if self._toggled else 'toggleable', self.text))
 
 
 class _PanelCategoryItem(urwid.Columns):
@@ -63,8 +64,8 @@ class _PanelCategoryItem(urwid.Columns):
     """
 
     def __init__(self, first: str, second: str, formatter: Callable[[str, str], str], count: int,
-                 on_toggled: Callable[[], None]) -> None:
-        self._content_widget = _ToggleableText(formatter(first, second), on_toggled)
+                 is_toggled: bool, on_toggle: Callable[[bool], bool]) -> None:
+        self._content_widget = _ToggleableText(formatter(first, second), is_toggled, on_toggle)
         count_widget = urwid.Text('[{}]'.format(count), align=urwid.RIGHT)
         super().__init__([
             (urwid.WEIGHT, 26, self._content_widget),
@@ -81,8 +82,7 @@ class _PanelCategoryItem(urwid.Columns):
         return self._second
 
     def toggle_off(self) -> None:
-        if self._content_widget.is_toggled():
-            self._content_widget.toggle(invoke_callback=False)
+        self._content_widget.toggle_off()
 
 
 class _PanelCategory(urwid.Pile):
@@ -91,14 +91,16 @@ class _PanelCategory(urwid.Pile):
     """
 
     def __init__(self, category_name: str, items: List[Tuple[str, str, int]], formatter: Callable[[str, str], str],
-                 on_widget_toggled: Callable[[str], None]) -> None:
+                 on_widget_toggle: Callable[[str, bool], bool]) -> None:
         widget_title = urwid.Text(category_name)
 
         divider_widget = urwid.Divider()
-        self._widgets = dict()
+        self._widgets = collections.OrderedDict()
+        is_toggled = True
         for first, second, count in items:
-            self._widgets[first] = _PanelCategoryItem(first, second, formatter, count,
-                                                      functools.partial(on_widget_toggled, first))
+            self._widgets[first] = _PanelCategoryItem(first, second, formatter, count, is_toggled,
+                                                      functools.partial(on_widget_toggle, first))
+            is_toggled = False
 
         super().__init__([
             widget_title,
@@ -125,16 +127,16 @@ class _Panel(urwid.Pile):
 
     _INFO = '(Action: SPACE, Edit: e, Add: +, Remove: -)'
 
-    def __init__(self, groups: Set[str], on_group_toggled: Callable[[str], None], remotes: List[Tuple[str, str]],
-                 on_remote_toggled: Callable[[str], None], revisions: List[Tuple[str, str]],
-                 on_revision_toggled: Callable[[str], None]) -> None:
+    def __init__(self, groups: List[str], on_group_toggle: Callable[[str, bool], bool], remotes: List[Tuple[str, str]],
+                 on_remote_toggle: Callable[[str, bool], bool], revisions: List[Tuple[str, str]],
+                 on_revision_toggle: Callable[[str, bool], bool]) -> None:
         groups = [(group, '', 0) for group in groups]
         remotes = [(name, path, 0) for name, path in remotes]
         revisions = [(name, type_name, 0) for name, type_name in revisions]
 
-        self._remotes = _PanelCategory('Remotes', remotes, lambda a, b: '{} -> {}'.format(a, b), on_remote_toggled)
-        self._revisions = _PanelCategory('Revisions', revisions, lambda a, b: '{}/{}'.format(b, a), on_revision_toggled)
-        self._groups = _PanelCategory('Groups', groups, lambda a, b: a, on_group_toggled)
+        self._remotes = _PanelCategory('Remotes', remotes, lambda a, b: '{} -> {}'.format(a, b), on_remote_toggle)
+        self._revisions = _PanelCategory('Revisions', revisions, lambda a, b: '{}/{}'.format(b, a), on_revision_toggle)
+        self._groups = _PanelCategory('Groups', groups, lambda a, b: a, on_group_toggle)
         super().__init__([self._remotes, self._revisions, self._groups, urwid.Text(_Panel._INFO)])
 
     def columns(self) -> int:
@@ -246,8 +248,17 @@ class _GUI(object):
         groups = set()
         for project in projects:
             groups.update(project[-1])
-        self._panel = _Panel(groups, self._on_group_toggled, remotes, self._on_remote_toggled, revisions,
-                             self._on_revision_toggled)
+        groups = list(groups)
+
+        groups.sort()
+        remotes.sort()
+        revisions.sort()
+
+        self._panel = _Panel(groups, self._on_group_toggle, remotes, self._on_remote_toggle, revisions,
+                             self._on_revision_toggle)
+        self._selected_remote = remotes[0][0]
+        self._selected_revision = revisions[0][0]
+        self._selected_groups = {groups[0]}
 
         palette = [
             ('toggleable', 'default', 'default'),
@@ -259,19 +270,28 @@ class _GUI(object):
             (self._panel.columns(), urwid.Filler(self._panel, urwid.TOP))
         ]), palette).run()
 
-    # TODO: Maybe return a bool for validating or not the fact that the widget has been toggled.
-    def _on_remote_toggled(self, remote_name: str) -> None:
+    def _on_remote_toggle(self, remote_name: str, will_be_toggled: bool) -> bool:
+        if not will_be_toggled:  # Remotes cannot be unselected.
+            return False
+
         for remote in self._panel.remotes().get_widgets():
             if remote_name != remote.first():
                 remote.toggle_off()
 
-    def _on_revision_toggled(self, revision_name: str) -> None:
+        return True
+
+    def _on_revision_toggle(self, revision_name: str, will_be_toggled: bool) -> bool:
+        if not will_be_toggled:  # Revisions cannot be unselected.
+            return False
+
         for revision in self._panel.revisions().get_widgets():
             if revision_name != revision.first():
                 revision.toggle_off()
 
-    def _on_group_toggled(self, group_name: str) -> None:
-        pass  # Nothing to do, several groups can be selected at once.
+        return True
+
+    def _on_group_toggle(self, group_name: str, will_be_toggled: bool) -> bool:
+        return True  # Nothing to do, several groups can be selected at once.
 
 
 class ManifestEditor(object):
@@ -282,8 +302,9 @@ class ManifestEditor(object):
     def __init__(self, local_manifest: manifest.LocalManifest) -> None:
         projects = [(project.name(), project.path(), project.override(), project.ref().name(), project.remote().name(),
                      project.groups()) for project in local_manifest.projects()]
-        _GUI(projects, [(remote.name(), remote.path()) for remote in local_manifest.remotes()],
-             [(ref.name(), ref.type()) for ref in local_manifest.refs()])
+        remotes = [(remote.name(), remote.path()) for remote in local_manifest.remotes()]
+        revisions = [(ref.name(), ref.type()) for ref in local_manifest.refs()]
+        _GUI(projects, remotes, revisions)
 
     def on_group_added(self, group_name: str) -> None:
         pass
