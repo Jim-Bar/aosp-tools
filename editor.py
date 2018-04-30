@@ -193,14 +193,32 @@ class _Project(urwid.SelectableIcon):
     """
 
     def __init__(self, name: str, path: str, override: bool, revision: str, remote: str, groups: List[str],
-                 maximums: _Max) -> None:
+                 maximums: _Max, on_project_edit: Callable[[str, str], None]) -> None:
         self._name = name
         self._path = path
         self._override = override
         self._revision = revision
         self._remote = remote
         self._groups = groups
+        self._maximums = maximums
+        self._on_project_edit = on_project_edit
         super().__init__(self._build_text(maximums), cursor_position=0)
+
+    def edit(self, groups: Union[List[str], None]=None, remote: str='', revision: str='') -> None:
+        if groups is not None:  # None means the groups did not change. Empty list means there are no more groups.
+            self._groups = groups
+        if remote:
+            self._remote = remote
+        if revision:
+            self._revision = revision
+        self.set_text(self._build_text(self._maximums))
+
+    def keypress(self, size, key):
+        if key.lower() in {'g', 'r', 'v'}:
+            self._on_project_edit(self._name, key.lower())
+            return None
+        else:
+            return super().keypress(size, key)
 
     def _build_text(self, maximums: _Max) -> str:
         return '{} {} {} {} {} {}'.format('*' if self._override else ' ', self._name.ljust(maximums.name()),
@@ -214,15 +232,17 @@ class _ProjectList(urwid.Pile):
     TODO
     """
 
-    def __init__(self, projects: List[Tuple[str, str, bool, str, str, List[str]]]) -> None:
-        self._projects = dict()
+    def __init__(self, projects: List[Tuple[str, str, bool, str, str, List[str]]],
+                 on_project_edit: Callable[[str, str], None]) -> None:
+        self._projects = collections.OrderedDict()
 
         self._max = _Max(_Max.max_length(projects, 0, 'name'), _Max.max_length(projects, 1, 'path'),
                          _Max.max_length(projects, 3, 'revision'), _Max.max_length(projects, 4, 'remote'),
                          _Max.max_length(projects, 5, 'groups', ','.join))
 
         for name, path, override, revision, remote, groups in projects:
-            self._projects[name] = _Project(name, path, override, revision, remote, groups, self._max)
+            self._projects[name] = _Project(name, path, override, revision, remote, groups, self._max,
+                                            on_project_edit)
 
         super().__init__([
             urwid.Text('  {} {} {} {} {}'.format('name'.ljust(self._max.name(), ' '),
@@ -233,8 +253,8 @@ class _ProjectList(urwid.Pile):
             urwid.Pile(self._projects.values())
         ])
 
-    def projects(self) -> Dict[str, _Project]:
-        return self._projects
+    def project(self, project_name: str) -> _Project:
+        return self._projects[project_name]
 
 
 class _GUI(object):
@@ -242,18 +262,21 @@ class _GUI(object):
     TODO
     """
 
-    def __init__(self, projects: List[Tuple[str, str, bool, str, str, List[str]]], remotes: List[Tuple[str, str]],
-                 revisions: List[Tuple[str, str]]) -> None:
-        self._projects_widget = _ProjectList(projects)
+    def __init__(self, editor: 'ManifestEditor', projects: List[Tuple[str, str, bool, str, str, List[str]]],
+                 remotes: List[Tuple[str, str]], revisions: List[Tuple[str, str]]) -> None:
+        self._editor = editor
+
         groups = set()
         for project in projects:
             groups.update(project[-1])
         groups = list(groups)
 
+        projects.sort()
         groups.sort()
         remotes.sort()
         revisions.sort()
 
+        self._projects_widget = _ProjectList(projects, self._on_project_edit)
         self._panel = _Panel(groups, self._on_group_toggle, remotes, self._on_remote_toggle, revisions,
                              self._on_revision_toggle)
         self._selected_remote = remotes[0][0]
@@ -268,7 +291,11 @@ class _GUI(object):
         urwid.MainLoop(urwid.Columns([
             urwid.Filler(self._projects_widget, urwid.TOP),
             (self._panel.columns(), urwid.Filler(self._panel, urwid.TOP))
-        ]), palette).run()
+        ]), palette, unhandled_input=self._on_key_press).run()
+
+    def _on_key_press(self, key: str) -> None:
+        if key == 'enter':
+            raise urwid.ExitMainLoop()
 
     def _on_remote_toggle(self, remote_name: str, will_be_toggled: bool) -> bool:
         if not will_be_toggled:  # Remotes cannot be unselected.
@@ -278,6 +305,7 @@ class _GUI(object):
             if remote_name != remote.first():
                 remote.toggle_off()
 
+        self._selected_remote = remote_name
         return True
 
     def _on_revision_toggle(self, revision_name: str, will_be_toggled: bool) -> bool:
@@ -288,10 +316,27 @@ class _GUI(object):
             if revision_name != revision.first():
                 revision.toggle_off()
 
+        self._selected_revision = revision_name
         return True
 
     def _on_group_toggle(self, group_name: str, will_be_toggled: bool) -> bool:
-        return True  # Nothing to do, several groups can be selected at once.
+        if will_be_toggled:
+            self._selected_groups.add(group_name)
+        else:
+            self._selected_groups.remove(group_name)
+
+        return True
+
+    def _on_project_edit(self, project_name: str, key: str) -> None:
+        if key == 'g':
+            self._projects_widget.project(project_name).edit(groups=sorted(list(self._selected_groups)))
+            self._editor.on_project_edited(project_name, groups=list(self._selected_groups))
+        elif key == 'r':
+            self._projects_widget.project(project_name).edit(remote=self._selected_remote)
+            self._editor.on_project_edited(project_name, remote_name=self._selected_remote)
+        elif key == 'v':
+            self._projects_widget.project(project_name).edit(revision=self._selected_revision)
+            self._editor.on_project_edited(project_name, revision_name=self._selected_revision)
 
 
 class ManifestEditor(object):
@@ -304,16 +349,7 @@ class ManifestEditor(object):
                      project.groups()) for project in local_manifest.projects()]
         remotes = [(remote.name(), remote.path()) for remote in local_manifest.remotes()]
         revisions = [(ref.name(), ref.type()) for ref in local_manifest.refs()]
-        _GUI(projects, remotes, revisions)
-
-    def on_group_added(self, group_name: str) -> None:
-        pass
-
-    def on_group_renamed(self, group_old_name: str, group_new_name: str) -> None:
-        pass
-
-    def on_group_removed(self, group_name: str) -> None:
-        pass
+        _GUI(self, projects, remotes, revisions)
 
     def on_project_added(self, project_name: str, project_path: str, override: bool) -> None:
         pass
