@@ -87,11 +87,26 @@ class LocalManifestProject(object):
     def path(self) -> str:
         return self._path
 
+    def ref(self) -> LocalManifestRef:
+        return self._ref
+
     def remote(self) -> LocalManifestRemote:
         return self._remote
 
-    def ref(self) -> LocalManifestRef:
-        return self._ref
+    def set_groups(self, new_groups: List[str]) -> None:
+        self._groups = new_groups
+
+    def set_override(self, new_override: bool) -> None:
+        self._override = new_override
+
+    def set_path(self, new_path: str) -> None:
+        self._path = new_path
+
+    def set_ref(self, new_ref: LocalManifestRef) -> None:
+        self._ref = new_ref
+
+    def set_remote(self, new_remote: LocalManifestRemote) -> None:
+        self._remote = new_remote
 
 
 class LocalManifest(object):

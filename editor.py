@@ -28,7 +28,7 @@ import functools
 import manifest
 import urwid
 
-from typing import Callable, Dict, Iterable, List, Tuple, Union
+from typing import Callable, Iterable, List, Tuple, Union
 
 
 class _ToggleableText(urwid.SelectableIcon):
@@ -214,11 +214,17 @@ class _Project(urwid.SelectableIcon):
         self.set_text(self._build_text(self._maximums))
 
     def keypress(self, size, key):
-        if key.lower() in {'g', 'r', 'v'}:
+        if key.lower() in {'g', 'o', 'r', 'v'}:
             self._on_project_edit(self._name, key.lower())
             return None
         else:
             return super().keypress(size, key)
+
+    def toggle_override(self) -> bool:
+        self._override = not self._override
+        self.edit()  # Redraw.
+
+        return self._override
 
     def _build_text(self, maximums: _Max) -> str:
         return '{} {} {} {} {} {}'.format('*' if self._override else ' ', self._name.ljust(maximums.name()),
@@ -331,6 +337,9 @@ class _GUI(object):
         if key == 'g':
             self._projects_widget.project(project_name).edit(groups=sorted(list(self._selected_groups)))
             self._editor.on_project_edited(project_name, groups=list(self._selected_groups))
+        elif key == 'o':
+            override = self._projects_widget.project(project_name).toggle_override()
+            self._editor.on_project_edited(project_name, override=override)
         elif key == 'r':
             self._projects_widget.project(project_name).edit(remote=self._selected_remote)
             self._editor.on_project_edited(project_name, remote_name=self._selected_remote)
@@ -345,18 +354,33 @@ class ManifestEditor(object):
     """
 
     def __init__(self, local_manifest: manifest.LocalManifest) -> None:
+        self._local_manifest = local_manifest
+
+    def edit(self) -> None:
         projects = [(project.name(), project.path(), project.override(), project.ref().name(), project.remote().name(),
-                     project.groups()) for project in local_manifest.projects()]
-        remotes = [(remote.name(), remote.path()) for remote in local_manifest.remotes()]
-        revisions = [(ref.name(), ref.type()) for ref in local_manifest.refs()]
+                     project.groups()) for project in self._local_manifest.projects()]
+        remotes = [(remote.name(), remote.path()) for remote in self._local_manifest.remotes()]
+        revisions = [(ref.name(), ref.type()) for ref in self._local_manifest.refs()]
         _GUI(self, projects, remotes, revisions)
 
     def on_project_added(self, project_name: str, project_path: str, override: bool) -> None:
         pass
 
     def on_project_edited(self, project_name: str, project_path: str='', remote_name: str='', revision_name: str='',
-                          groups: List[str]=list(), override: Union[bool, None]=None) -> None:
-        pass
+                          groups: Union[List[str], None]=None, override: Union[bool, None]=None) -> None:
+        project = next(project for project in self._local_manifest.projects() if project.name() == project_name)
+        if project_path:
+            project.set_path(project_path)
+        if remote_name:
+            remote = next(remote for remote in self._local_manifest.remotes() if remote.name() == remote_name)
+            project.set_remote(remote)
+        if revision_name:
+            revision = next(revision for revision in self._local_manifest.refs() if revision.name() == revision_name)
+            project.set_ref(revision)
+        if groups is not None:
+            project.set_groups(groups)
+        if override is not None:
+            project.set_override(override)
 
     def on_project_renamed(self, project_old_name: str, project_new_name: str) -> None:
         pass
@@ -390,5 +414,7 @@ class ManifestEditor(object):
 
 
 if __name__ == '__main__':
-    ManifestEditor(manifest.LocalManifest.from_revisions(configuration.Configuration.read_configuration(),
-                                                         'generic-int', 'sailfish-7.1.1-int'))
+    manifest = manifest.LocalManifest.from_revisions(configuration.Configuration.read_configuration(),
+                                                     'generic-int', 'sailfish-7.1.1-int')
+    ManifestEditor(manifest).edit()
+    manifest.to_file('local_manifest.editor.xml')  # TODO: Well... You know what to do.
