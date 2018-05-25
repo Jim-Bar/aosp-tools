@@ -35,9 +35,9 @@ from typing import List
 
 
 class LocalManifestRef(object):
-    def __init__(self, name: str, type_name: str) -> None:
+    def __init__(self, name: str, is_tag: bool) -> None:
         self._name = name
-        self._is_tag = type_name == 'tag'
+        self._is_tag = is_tag
 
     def is_tag(self) -> bool:
         return self._is_tag
@@ -129,14 +129,11 @@ class LocalManifest(object):
                                                             os.path.basename(temp_directory))
             configuration.repository_local_manifest().checkout(specific_ref)
 
-            if specific_ref in configuration.repository_local_manifest().get_tags():
-                ref_type = 'tags'
-            else:
-                ref_type = 'heads'
+            ref_is_tag = specific_ref in configuration.repository_local_manifest().get_tags()
 
             local_manifest_path = os.path.join(temp_directory, configuration.local_manifest_file())
-            local_manifest_content = LocalManifest._customize_template_file(ref_type, local_manifest_path, generic_ref,
-                                                                            specific_ref)
+            local_manifest_content = LocalManifest._customize_template_file(ref_is_tag, local_manifest_path,
+                                                                            generic_ref, specific_ref)
             return LocalManifest._from_string(local_manifest_content)
 
     def projects(self) -> List[LocalManifestProject]:
@@ -171,7 +168,7 @@ class LocalManifest(object):
                 'name': project.name(),
                 'path': project.path(),
                 'remote': project.remote().name(),
-                'revision': 'refs/{}/{}'.format(project.ref().type(), project.ref().name())
+                'revision': 'refs/{}s/{}'.format(project.ref().type(), project.ref().name())
             }
             if project.groups():
                 project_element_attributes['groups'] = ','.join(project.groups())
@@ -186,11 +183,12 @@ class LocalManifest(object):
         xml.etree.ElementTree.ElementTree(manifest_node).write(file_path, encoding='UTF-8', xml_declaration=True)
 
     @staticmethod
-    def _customize_template_file(ref_type: str, local_manifest_path: str, generic_ref: str, specific_ref: str) -> str:
+    def _customize_template_file(ref_is_tag: bool, local_manifest_path: str, generic_ref: str,
+                                 specific_ref: str) -> str:
         with open(local_manifest_path) as local_manifest_file:
             local_manifest_content = local_manifest_file.read()
 
-        local_manifest_content = local_manifest_content.replace('@TYPE@', ref_type)
+        local_manifest_content = local_manifest_content.replace('@TYPE@', 'tags' if ref_is_tag else 'heads')
         local_manifest_content = local_manifest_content.replace('@GENERIC_VERSION@', generic_ref)
         local_manifest_content = local_manifest_content.replace('@SPECIFIC_VERSION@', specific_ref)
 
@@ -239,7 +237,7 @@ class LocalManifest(object):
             # Get type (branch or tag) and revision name.
             _, ref_type, ref_name = xml_root_child.attrib['revision'].split('/')
             if ref_name not in refs:
-                refs[ref_name] = LocalManifestRef(ref_name, ref_type)
+                refs[ref_name] = LocalManifestRef(ref_name, ref_type == 'tags')
             ref = refs[ref_name]
 
             # If the path of the repository is in the list of the removed projects' paths, this means that this
