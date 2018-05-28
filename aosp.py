@@ -47,6 +47,8 @@ class BuildOptions(object):
     """
 
     def __init__(self, num_cores: int, ota_package: bool, update_package: bool) -> None:
+        if num_cores == 0:  # Resolve the real number of available cores.
+            num_cores = int(subprocess.check_output(['nproc']))
         self._num_cores = num_cores
         self._ota_package = ota_package
         self._update_package = update_package
