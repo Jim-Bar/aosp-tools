@@ -171,6 +171,9 @@ class Repository(object):
 
         return _GitUtils.get_branches(self._clone_path, show_remotes)
 
+    def get_path_name(self) -> str:
+        return '{}/{}'.format(self._path, self._name)
+
     def get_tags(self) -> List[str]:
         self._check_cloned()
 
@@ -178,13 +181,13 @@ class Repository(object):
 
     def get_remote_url(self) -> str:
         if self._protocol == 'file':
-            return 'file://{}/{}/{}'.format(self._remote, self._path, self._name)
+            return 'file://{}/{}'.format(self._remote, self.get_path_name())
         elif self._protocol == 'ssh':
-            return '{}@{}:{}/{}'.format(self._user, self._remote, self._path, self._name)
+            return '{}@{}:{}'.format(self._user, self._remote, self.get_path_name())
         elif self._protocol == 'http':
-            return 'http://{}/{}/{}'.format(self._remote, self._path, self._name)
+            return 'http://{}/{}'.format(self._remote, self.get_path_name())
         elif self._protocol == 'https':
-            return 'https://{}/{}/{}'.format(self._remote, self._path, self._name)
+            return 'https://{}/{}'.format(self._remote, self.get_path_name())
 
     def remote_refs(self) -> Tuple[List[str], List[str]]:
         return _GitUtils.remote_refs(self.get_remote_url())

@@ -34,7 +34,7 @@ from configuration import Configuration
 
 class CommandLineAdapter(object):
     def __init__(self, configuration: Configuration) -> None:
-        parser = argparse.ArgumentParser(description='Clone, build and flash an AOSP',
+        parser = argparse.ArgumentParser(description='Clone and build an AOSP',
                                          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
         # Required arguments.
@@ -44,59 +44,63 @@ class CommandLineAdapter(object):
                                     required=True,
                                     default=argparse.SUPPRESS)
         required_group.add_argument('-v', '--version',
-                                    help='version code of XpertEye (e.g. 4.0.0)',
+                                    help='version code of XpertEye (e.g. 4.1.0)',
                                     required=True,
                                     default=argparse.SUPPRESS)
 
         # Optional arguments.
-        parser.add_argument('-d', '--device',
-                            help='device code name',
-                            choices=configuration.devices(),
-                            default=configuration.default_device())
-        parser.add_argument('-g', '--generic',
-                            help='generic Git ref (default: {})'.format(configuration.default_generic_ref()),
-                            default=argparse.SUPPRESS)  # Simulate a default value, for exclusion with --local-manifest.
-        parser.add_argument('-n', '--name',
-                            help='named prefix added to the name of the directory of the AOSP',
-                            default=configuration.default_name())
         parser.add_argument('-c', '--cores',
                             help='number of cores to use; 0 for all cores',
                             default=configuration.default_num_cores(),
                             type=int)
-        parser.add_argument('-w', '--path',
-                            help='path to the AOSP',
-                            default=configuration.default_path())
-        parser.add_argument('-p', '--project',
-                            help='project of XpertEye',
-                            choices=configuration.projects(),
-                            default=configuration.default_project())
-        parser.add_argument('-x', '--variant',
-                            help='build variant',
-                            choices=configuration.profiles(),
-                            default=configuration.default_profile())
-        parser.add_argument('-s', '--specific',
-                            help='specific Git ref (default: {})'.format(configuration.default_specific_ref()),
+        parser.add_argument('-d', '--device',
+                            help='device code name',
+                            choices=configuration.devices(),
+                            default=configuration.default_device())
+        parser.add_argument('-f', '--firmwares',
+                            help='Git ref for copy of {}'.format(configuration.repository_firmwares().get_path_name()),
+                            default=configuration.default_specific_ref())
+        parser.add_argument('-g', '--generic',
+                            help='generic Git ref (default: {})'.format(configuration.default_generic_ref()),
                             default=argparse.SUPPRESS)  # Simulate a default value, for exclusion with --local-manifest.
         parser.add_argument('-l', '--local-manifest',
                             help='path to a local manifest',
                             default=argparse.SUPPRESS)
-        parser.add_argument('-f', '--firmwares',
-                            help='Git ref for copy of {}'.format(configuration.repository_firmwares().get_remote_url()),
-                            default=configuration.default_specific_ref())
+        parser.add_argument('-n', '--name',
+                            help='named prefix added to the name of the directory of the AOSP',
+                            default=configuration.default_name())
+        parser.add_argument('-p', '--project',
+                            help='project of XpertEye',
+                            choices=configuration.projects(),
+                            default=configuration.default_project())
+        parser.add_argument('-s', '--specific',
+                            help='specific Git ref (default: {})'.format(configuration.default_specific_ref()),
+                            default=argparse.SUPPRESS)  # Simulate a default value, for exclusion with --local-manifest.
+        parser.add_argument('-w', '--path',
+                            help='path to the AOSP',
+                            default=configuration.default_path())
+        parser.add_argument('-x', '--variant',
+                            help='build variant',
+                            choices=configuration.profiles(),
+                            default=configuration.default_profile())
 
         # Constant arguments.
         parser.add_argument('-b', '--build',
                             help='build the AOSP',
-                            action='store_true')
+                            action='store_true',
+                            default=argparse.SUPPRESS)
         parser.add_argument('-o', '--ota',
                             help='build the OTA package',
-                            action='store_true')
+                            action='store_true',
+                            default=argparse.SUPPRESS)
         parser.add_argument('-u', '--update',
                             help='build the update package',
-                            action='store_true')
+                            action='store_true',
+                            default=argparse.SUPPRESS)
         parser.add_argument('-y', '--yes',
                             help='automatically continue when prompted',
-                            action='store_true')
+                            action='store_true',
+                            default=argparse.SUPPRESS)
 
         # Parse and sanity checks.
         self._args = parser.parse_args()
@@ -106,7 +110,7 @@ class CommandLineAdapter(object):
             if self.generic_ref() or self.specific_ref():
                 parser.error('-l/--local-manifest cannot be used with -g/--generic or -s/--specific')
             if not os.path.exists(self.local_manifest()):
-                parser.error('Local manifest {} does not exist'.format(self.local_manifest()))
+                parser.error('Local manifest "{}" does not exist'.format(self.local_manifest()))
         else:
             if not self.generic_ref():
                 self._args.generic = configuration.default_generic_ref()  # Simulate a default value.
@@ -115,15 +119,15 @@ class CommandLineAdapter(object):
 
             heads, tags = configuration.repository_local_manifest().remote_refs()
             if self.specific_ref() not in heads and self.specific_ref() not in tags:
-                parser.error('Specific Git reference {} does not exist'.format(self.specific_ref()))
+                parser.error('Specific Git reference "{}" does not exist'.format(self.specific_ref()))
+        if not os.path.exists(self.path()):
+            parser.error('Path "{}" does not exist'.format(self.path()))
+        if os.path.exists(os.path.join(self.path(), self.name())):
+            parser.error('Path "{}" already exists'.format(self.path()))
         android_release_tags = {tag for tag in configuration.repository_build().remote_refs()[1]
                                 if bool(re.match('^android-\d\.\d\.\d_r\d\d$', tag))}
-        if not os.path.exists(self.path()):
-            parser.error('Path {} does not exist'.format(self.path()))
-        if os.path.exists(os.path.join(self.path(), self.name())):
-            parser.error('Path {} already exists'.format(self.path()))
         if self.release() not in android_release_tags:
-            parser.error('Android release {} does not exist'.format(self.release()))
+            parser.error('Android release "{}" does not exist'.format(self.release()))
 
     def build(self) -> bool:
         return self._args.build
