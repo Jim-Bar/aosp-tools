@@ -26,12 +26,14 @@
 #
 
 import os
+import sys
 import tempfile
 import xml.etree.ElementTree
 import xmlindent
 
+from commandline import LocalManifestCommandLineInterface
 from configuration import Configuration
-from typing import List
+from typing import List, TextIO, Union
 
 
 class LocalManifestRef(object):
@@ -120,21 +122,22 @@ class LocalManifest(object):
     @staticmethod
     def from_file(local_manifest_path: str) -> 'LocalManifest':
         with open(local_manifest_path) as local_manifest_file:
-            return LocalManifest._from_string(local_manifest_file.read())
+            return LocalManifest.from_string(local_manifest_file.read())
 
     @staticmethod
-    def from_revisions(configuration: Configuration, generic_ref: str, specific_ref: str) -> 'LocalManifest':
+    def from_revisions(configuration: Configuration, generic_ref: str, ref: str, specific_ref: str) -> 'LocalManifest':
         with tempfile.TemporaryDirectory() as temp_directory:
-            configuration.repository_local_manifest().clone(os.path.dirname(temp_directory),
-                                                            os.path.basename(temp_directory))
-            configuration.repository_local_manifest().checkout(specific_ref)
+            with configuration.repository_local_manifest().std_context(False, False):
+                configuration.repository_local_manifest().clone(os.path.dirname(temp_directory),
+                                                                os.path.basename(temp_directory))
+                configuration.repository_local_manifest().checkout(ref)
 
             ref_is_tag = specific_ref in configuration.repository_local_manifest().get_tags()
 
             local_manifest_path = os.path.join(temp_directory, configuration.local_manifest_file())
             local_manifest_content = LocalManifest._customize_template_file(ref_is_tag, local_manifest_path,
                                                                             generic_ref, specific_ref)
-            return LocalManifest._from_string(local_manifest_content)
+            return LocalManifest.from_string(local_manifest_content)
 
     def projects(self) -> List[LocalManifestProject]:
         return self._projects
@@ -145,7 +148,7 @@ class LocalManifest(object):
     def remotes(self) -> List[LocalManifestRemote]:
         return self._remotes
 
-    def to_file(self, file_path: str) -> None:
+    def to_file(self, output_file: Union[str, TextIO]) -> None:
         manifest_node = xml.etree.ElementTree.Element('manifest')
 
         for remote in self._remotes:
@@ -180,7 +183,7 @@ class LocalManifest(object):
             manifest_node.append(project_element)
 
         xmlindent.indent(manifest_node)
-        xml.etree.ElementTree.ElementTree(manifest_node).write(file_path, encoding='UTF-8', xml_declaration=True)
+        xml.etree.ElementTree.ElementTree(manifest_node).write(output_file, encoding='unicode', xml_declaration=True)
 
     @staticmethod
     def _customize_template_file(ref_is_tag: bool, local_manifest_path: str, generic_ref: str,
@@ -195,7 +198,7 @@ class LocalManifest(object):
         return local_manifest_content
 
     @staticmethod
-    def _from_string(local_manifest_content: str) -> 'LocalManifest':
+    def from_string(local_manifest_content: str) -> 'LocalManifest':
         xml_root = xml.etree.ElementTree.fromstring(local_manifest_content)
 
         removed_paths = list()
@@ -232,7 +235,7 @@ class LocalManifest(object):
             try:
                 groups = xml_root_child.attrib['groups'].split(',')
             except KeyError:
-                groups = ''
+                groups = list()
 
             # Get type (branch or tag) and revision name.
             _, ref_type, ref_name = xml_root_child.attrib['revision'].split('/')
@@ -252,3 +255,14 @@ class LocalManifest(object):
             projects.append(LocalManifestProject(name, path, remote, groups, ref, overrides, children))
 
         return LocalManifest(projects, list(refs.values()), list(remotes.values()))
+
+
+def main():
+    configuration = Configuration.read_configuration()
+    cli = LocalManifestCommandLineInterface(configuration)
+    local_manifest = LocalManifest.from_revisions(configuration, cli.generic_ref(), cli.ref(), cli.specific_ref())
+    local_manifest.to_file(sys.stdout)
+
+
+if __name__ == '__main__':
+    main()

@@ -28,13 +28,14 @@
 import argparse
 import os
 import re
+import sys
 
 from configuration import Configuration
 
 
-class CommandLineAdapter(object):
+class AOSPCommandLineInterface(object):
     def __init__(self, configuration: Configuration) -> None:
-        parser = argparse.ArgumentParser(description='Clone and build an AOSP',
+        parser = argparse.ArgumentParser(description='Clone & build an AOSP. Read a local manifest from standard input',
                                          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
         # Required arguments.
@@ -60,12 +61,6 @@ class CommandLineAdapter(object):
         parser.add_argument('-f', '--firmwares',
                             help='Git ref for copy of {}'.format(configuration.repository_firmwares().get_path_name()),
                             default=configuration.default_specific_ref())
-        parser.add_argument('-g', '--generic',
-                            help='generic Git ref (default: {})'.format(configuration.default_generic_ref()),
-                            default=argparse.SUPPRESS)  # Simulate a default value, for exclusion with --local-manifest.
-        parser.add_argument('-l', '--local-manifest',
-                            help='path to a local manifest',
-                            default=argparse.SUPPRESS)
         parser.add_argument('-n', '--name',
                             help='named prefix added to the name of the directory of the AOSP',
                             default=configuration.default_name())
@@ -73,9 +68,6 @@ class CommandLineAdapter(object):
                             help='project of XpertEye',
                             choices=configuration.projects(),
                             default=configuration.default_project())
-        parser.add_argument('-s', '--specific',
-                            help='specific Git ref (default: {})'.format(configuration.default_specific_ref()),
-                            default=argparse.SUPPRESS)  # Simulate a default value, for exclusion with --local-manifest.
         parser.add_argument('-w', '--path',
                             help='path to the AOSP',
                             default=configuration.default_path())
@@ -87,39 +79,21 @@ class CommandLineAdapter(object):
         # Constant arguments.
         parser.add_argument('-b', '--build',
                             help='build the AOSP',
-                            action='store_true',
-                            default=argparse.SUPPRESS)
+                            action='store_true')
         parser.add_argument('-o', '--ota',
                             help='build the OTA package',
-                            action='store_true',
-                            default=argparse.SUPPRESS)
+                            action='store_true')
         parser.add_argument('-u', '--update',
                             help='build the update package',
-                            action='store_true',
-                            default=argparse.SUPPRESS)
+                            action='store_true')
         parser.add_argument('-y', '--yes',
                             help='automatically continue when prompted',
-                            action='store_true',
-                            default=argparse.SUPPRESS)
+                            action='store_true')
 
         # Parse and sanity checks.
         self._args = parser.parse_args()
         if self.num_cores() < 0:
             parser.error('-c/--cores must be greater than or equal to zero')
-        if self.local_manifest():
-            if self.generic_ref() or self.specific_ref():
-                parser.error('-l/--local-manifest cannot be used with -g/--generic or -s/--specific')
-            if not os.path.exists(self.local_manifest()):
-                parser.error('Local manifest "{}" does not exist'.format(self.local_manifest()))
-        else:
-            if not self.generic_ref():
-                self._args.generic = configuration.default_generic_ref()  # Simulate a default value.
-            if not self.specific_ref():
-                self._args.specific = configuration.default_specific_ref()  # Simulate a default value.
-
-            heads, tags = configuration.repository_local_manifest().remote_refs()
-            if self.specific_ref() not in heads and self.specific_ref() not in tags:
-                parser.error('Specific Git reference "{}" does not exist'.format(self.specific_ref()))
         if not os.path.exists(self.path()):
             parser.error('Path "{}" does not exist'.format(self.path()))
         if os.path.exists(os.path.join(self.path(), self.name())):
@@ -128,6 +102,8 @@ class CommandLineAdapter(object):
                                 if bool(re.match('^android-\d\.\d\.\d_r\d\d$', tag))}
         if self.release() not in android_release_tags:
             parser.error('Android release "{}" does not exist'.format(self.release()))
+        self._local_manifest_string = sys.stdin.read()
+        sys.stdin = open('/dev/tty', 'r')  # "Reopen" standard input.
 
     def build(self) -> bool:
         return self._args.build
@@ -141,17 +117,8 @@ class CommandLineAdapter(object):
     def firmwares_ref(self) -> str:
         return self._args.firmwares
 
-    def generic_ref(self) -> str:
-        try:
-            return self._args.generic
-        except AttributeError:
-            return ''
-
     def local_manifest(self) -> str:
-        try:
-            return os.path.realpath(self._args.local_manifest)
-        except AttributeError:
-            return ''
+        return self._local_manifest_string
 
     def name(self) -> str:
         return self._args.name
@@ -174,14 +141,43 @@ class CommandLineAdapter(object):
     def release(self) -> str:
         return self._args.release
 
-    def specific_ref(self) -> str:
-        try:
-            return self._args.specific
-        except AttributeError:
-            return ''
-
     def update_package(self) -> bool:
         return self._args.update
 
     def version(self) -> str:
         return self._args.version
+
+
+class LocalManifestCommandLineInterface(object):
+    def __init__(self, configuration: Configuration) -> None:
+        parser = argparse.ArgumentParser(description='Fetch a local manifest',
+                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+        # Optional arguments.
+        parser.add_argument('-g', '--generic',
+                            help='generic Git ref',
+                            default=configuration.default_generic_ref())
+        parser.add_argument('-r', '--revision',
+                            help='local manifest Git ref (will copy -s/--specific if not provided)',
+                            default=argparse.SUPPRESS)
+        parser.add_argument('-s', '--specific',
+                            help='specific Git ref',
+                            default=configuration.default_specific_ref())
+
+        # Parse and sanity checks.
+        self._args = parser.parse_args()
+        heads, tags = configuration.repository_local_manifest().remote_refs()
+        if self.specific_ref() not in heads and self.specific_ref() not in tags:
+            parser.error('Specific Git reference "{}" does not exist'.format(self.specific_ref()))
+
+    def generic_ref(self) -> str:
+        return self._args.generic
+
+    def ref(self) -> str:
+        try:
+            return self._args.ref
+        except AttributeError:
+            return self.specific_ref()
+
+    def specific_ref(self) -> str:
+        return self._args.specific

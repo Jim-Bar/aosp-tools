@@ -34,7 +34,7 @@ import subprocess
 import sys
 import tempfile
 
-from commandline import CommandLineAdapter
+from commandline import AOSPCommandLineInterface
 from configuration import Configuration
 from manifest import LocalManifest
 from repo import RepoAdapter
@@ -68,8 +68,8 @@ class AOSPEnvironment(object):
     All the characteristics of an Android Open Source Project.
     """
 
-    def __init__(self, path: str, prefix: str, release: str, variant: str, device: str, specific_ref: str,
-                 firmwares_ref: str, generic_ref: str, version: str, project: str, local_manifest: str) -> None:
+    def __init__(self, path: str, prefix: str, release: str, variant: str, device: str, firmwares_ref: str,
+                 version: str, project: str) -> None:
         self._path = os.path.join(os.path.realpath(path), '{}_{}_{}_{}'.format(prefix, release, variant, device))
         self._release = release
         self._variant = variant
@@ -77,12 +77,9 @@ class AOSPEnvironment(object):
         self._version = version
         self._project = project
         self._firmwares_ref = firmwares_ref
-        self._specific_ref = specific_ref
-        self._generic_ref = generic_ref
-        self._local_manifest = local_manifest
         self._java_version = 8 if int(self._release.split('.')[0][len('android-'):]) >= 7 else 7
 
-        self._sanity_check()
+        AOSPEnvironment._sanity_check()
 
     def __str__(self) -> str:
         description = ''
@@ -95,11 +92,6 @@ class AOSPEnvironment(object):
         description += 'Version: {}\n'.format(self._version)
         description += 'Project: {}\n'.format(self._project)
         description += 'Firmwares ref: {}\n'.format(self._firmwares_ref)
-        if self._local_manifest:
-            description += 'Local manifest: {}\n'.format(self._local_manifest)
-        else:
-            description += 'Generic ref: {}\n'.format(self._generic_ref)
-            description += 'Specific ref: {}\n'.format(self._specific_ref)
         description += '=' * len('Path: {}'.format(self._path))
 
         return description
@@ -110,23 +102,8 @@ class AOSPEnvironment(object):
     def firmwares_ref(self) -> str:
         return self._firmwares_ref
 
-    def generic_ref(self) -> str:
-        if self._generic_ref:
-            return self._generic_ref
-        else:
-            raise AttributeError('Must use the local manifest')
-
-    def has_local_manifest(self) -> bool:
-        return len(self._local_manifest) > 0
-
     def java_version(self) -> int:
         return self._java_version
-
-    def local_manifest(self) -> str:
-        if self._local_manifest:
-            return self._local_manifest
-        else:
-            raise AttributeError('Must use the refs')
 
     def path(self) -> str:
         return self._path
@@ -137,25 +114,18 @@ class AOSPEnvironment(object):
     def release(self) -> str:
         return self._release
 
-    def specific_ref(self) -> str:
-        if self._specific_ref:
-            return self._specific_ref
-        else:
-            raise AttributeError('Must use the local manifest')
-
     def variant(self) -> str:
         return self._variant
 
     def version(self) -> str:
         return self._version
 
-    def _sanity_check(self) -> None:
+    @staticmethod
+    def _sanity_check() -> None:
         if not sys.platform.startswith('linux'):
             raise RuntimeError('Must be on Linux')
         if os.getuid() == 0:
             raise RuntimeError('Must not be root')
-        if self._local_manifest and (self._specific_ref or self._generic_ref):
-            raise ValueError('Either a local manifest or refs must be used, not both')
         RepoAdapter.sanity_check()
 
 
@@ -187,10 +157,10 @@ class AOSP(object):
         file_content += 'make {} updatepackage\n'.format('-j{}'.format(build_options.num_cores())
                                                          if build_options.num_cores() else '')
 
-    def clone(self, configuration: Configuration, build_options: BuildOptions) -> None:
+    def clone(self, configuration: Configuration, build_options: BuildOptions, local_manifest: LocalManifest) -> None:
         self._create(configuration, build_options)
         self._fetch_manifest(configuration)
-        self._fetch_local_manifest(configuration)
+        AOSP._fetch_local_manifest(configuration, local_manifest)
         RepoAdapter.sync()
         self._setup_ccache(configuration)
 
@@ -274,15 +244,10 @@ class AOSP(object):
             shutil.move(os.path.join(temp_directory, configuration.flash_script_path()),
                         self._delivery_directory(configuration))
 
-    def _fetch_local_manifest(self, configuration: Configuration) -> None:
+    @staticmethod
+    def _fetch_local_manifest(configuration: Configuration, local_manifest: LocalManifest) -> None:
         local_manifest_path = os.path.join(RepoAdapter.INSTALL_DIRECTORY, configuration.local_manifest_directory())
         os.mkdir(local_manifest_path)
-
-        if self._environment.has_local_manifest():
-            local_manifest = LocalManifest.from_file(self._environment.local_manifest())
-        else:
-            local_manifest = LocalManifest.from_revisions(configuration, self._environment.generic_ref(),
-                                                          self._environment.specific_ref())
         local_manifest.to_file(os.path.join(local_manifest_path, configuration.local_manifest_file()))
 
     def _fetch_manifest(self, configuration: Configuration) -> None:
@@ -314,10 +279,9 @@ class AOSP(object):
 
 def main():
     configuration = Configuration.read_configuration()
-    cli = CommandLineAdapter(configuration)
+    cli = AOSPCommandLineInterface(configuration)
     environment = AOSPEnvironment(cli.path(), cli.name(), cli.release(), cli.variant(), cli.device(),
-                                  cli.specific_ref(), cli.firmwares_ref(), cli.generic_ref(), cli.version(),
-                                  cli.project(), cli.local_manifest())
+                                  cli.firmwares_ref(), cli.version(), cli.project())
     print(environment)
     if not cli.continue_when_prompted():
         try:
@@ -327,7 +291,7 @@ def main():
             return
     aosp = AOSP(environment)
     options = BuildOptions(cli.num_cores(), cli.ota_package(), cli.update_package())
-    aosp.clone(configuration, options)
+    aosp.clone(configuration, options, LocalManifest.from_string(cli.local_manifest()))
     if cli.build():
         aosp.build_droid(configuration, options)
     if cli.update_package():

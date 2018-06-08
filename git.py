@@ -25,6 +25,7 @@
 # SOFTWARE.
 #
 
+import contextlib
 import os
 import subprocess
 
@@ -43,16 +44,19 @@ class _GitUtils(object):
         return subprocess.check_output(git_branch_command, cwd=working_directory).decode()
 
     @staticmethod
-    def checkout(reference: str, working_directory: str) -> None:
+    def checkout(reference: str, working_directory: str, stderr: bool=True, stdout: bool=True) -> None:
         git_checkout_command = ['git', 'checkout', reference]
-        subprocess.check_call(git_checkout_command, cwd=working_directory)
+        subprocess.check_call(git_checkout_command, cwd=working_directory, stderr=_GitUtils._std(stderr),
+                              stdout=_GitUtils._std(stdout))
 
     @staticmethod
-    def clone(working_directory: str, remote_url: str, directory_name: str='') -> None:
+    def clone(working_directory: str, remote_url: str, directory_name: str='', stderr: bool=True,
+              stdout: bool=False) -> None:
         git_clone_command = ['git', 'clone', remote_url]
         if directory_name:
             git_clone_command.append(directory_name)
-        subprocess.check_call(git_clone_command, cwd=working_directory)
+        subprocess.check_call(git_clone_command, cwd=working_directory, stderr=_GitUtils._std(stderr),
+                              stdout=_GitUtils._std(stdout))
 
     @staticmethod
     def current_branch(working_directory: str) -> str:
@@ -69,9 +73,10 @@ class _GitUtils(object):
         return subprocess.check_output(git_rev_parse_command, cwd=working_directory).decode().strip()
 
     @staticmethod
-    def fetch(working_directory: str) -> None:
+    def fetch(working_directory: str, stderr: bool=True, stdout: bool=True) -> None:
         git_fetch_command = ['git', 'fetch']
-        subprocess.check_call(git_fetch_command, cwd=working_directory)
+        subprocess.check_call(git_fetch_command, cwd=working_directory, stderr=_GitUtils._std(stderr),
+                              stdout=_GitUtils._std(stdout))
 
     @staticmethod
     def get_branches(working_directory: str, show_remotes: bool=False) -> List[str]:
@@ -107,9 +112,10 @@ class _GitUtils(object):
         return git_heads, git_tags
 
     @staticmethod
-    def pull(working_directory: str) -> None:
+    def pull(working_directory: str, stderr: bool=True, stdout: bool=True) -> None:
         git_pull_command = ['git', 'pull']
-        subprocess.check_call(git_pull_command, cwd=working_directory)
+        subprocess.check_call(git_pull_command, cwd=working_directory, stderr=_GitUtils._std(stderr),
+                              stdout=_GitUtils._std(stdout))
 
     @staticmethod
     def name(working_directory: str) -> str:
@@ -143,6 +149,10 @@ class _GitUtils(object):
         git_status_command = ['git', 'status', '-s']
         return subprocess.check_output(git_status_command, cwd=working_directory).decode().split()
 
+    @staticmethod
+    def _std(is_enabled: bool):
+        return None if is_enabled else subprocess.DEVNULL
+
 
 class Repository(object):
     """
@@ -156,14 +166,17 @@ class Repository(object):
         self._remote = remote
         self._path = path
         self._name = name
+        self._stderr_enabled = True
+        self._stdout_enabled = True
 
     def checkout(self, ref: str) -> None:
         self._check_cloned()
 
-        _GitUtils.checkout(ref, self._clone_path)
+        _GitUtils.checkout(ref, self._clone_path, stderr=self._stderr_enabled, stdout=self._stdout_enabled)
 
     def clone(self, working_directory: str, directory_name: str='') -> None:
-        _GitUtils.clone(working_directory, self.get_remote_url(), directory_name)
+        _GitUtils.clone(working_directory, self.get_remote_url(), directory_name, stderr=self._stderr_enabled,
+                        stdout=self._stdout_enabled)
         self._clone_path = os.path.realpath(os.path.join(working_directory, directory_name))
 
     def get_branches(self, show_remotes: bool=False) -> List[str]:
@@ -191,6 +204,16 @@ class Repository(object):
 
     def remote_refs(self) -> Tuple[List[str], List[str]]:
         return _GitUtils.remote_refs(self.get_remote_url())
+
+    @contextlib.contextmanager
+    def std_context(self, stderr_enabled: bool, stdout_enabled: bool):
+        stderr_enabled_initial = self._stderr_enabled
+        stdout_enabled_initial = self._stdout_enabled
+        self._stderr_enabled = stderr_enabled
+        self._stdout_enabled = stdout_enabled
+        yield
+        self._stderr_enabled = stderr_enabled_initial
+        self._stdout_enabled = stdout_enabled_initial
 
     def _check_cloned(self) -> None:
         if not self._clone_path:
