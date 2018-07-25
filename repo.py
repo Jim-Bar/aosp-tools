@@ -40,12 +40,14 @@ class RepoAdapter(object):
     _REPO = 'repo'
 
     @staticmethod
-    def init(url: str, ref: str='', component_groups: List[str]=list()) -> None:
+    def init(url: str, ref: str='', component_groups: List[str]=list(), depth: int=0) -> None:
         cmd = [RepoAdapter._REPO, 'init', '-u', url]
         if ref:
             cmd.extend(['-b', ref])
         if component_groups:
             cmd.extend(['-g', ','.join(component_groups)])
+        if depth:
+            cmd.extend(['--depth', depth])
         subprocess.check_call(cmd)
 
     @staticmethod
@@ -59,5 +61,12 @@ class RepoAdapter(object):
             raise RuntimeError('Missing {}'.format(RepoAdapter._REPO))
 
     @staticmethod
-    def sync() -> None:
-        subprocess.check_call([RepoAdapter._REPO, 'sync'])
+    def sync(num_jobs: int=0, current_branch_only: bool=False, no_tags: bool=False) -> None:
+        cmd = [RepoAdapter._REPO, 'sync']
+        if num_jobs:
+            cmd.extend(['-j{}'.format(num_jobs)])
+        if current_branch_only:
+            cmd.extend(['-c', '--no-clone-bundle'])
+        if no_tags:
+            cmd.extend(['--no-tags'])
+        subprocess.check_call(cmd)

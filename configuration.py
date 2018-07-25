@@ -57,6 +57,7 @@ class Configuration(configparser.ConfigParser):
     _SECTION_SHELL = 'Shell'
 
     _OPTION_BINARY_PATH = 'BinaryPath'
+    _OPTION_DEPTH = 'Depth'
     _OPTION_DEVICE = 'Device'
     _OPTION_DIST_DIR_NAME = 'DistDirName'
     _OPTION_FINAL_OUTPUT_DIR_NAME = 'DeliveryDirName'
@@ -68,7 +69,9 @@ class Configuration(configparser.ConfigParser):
     _OPTION_LOCAL_MANIFEST_FILE_NAME = 'LocalManifestFileName'
     _OPTION_NAME = 'Name'
     _OPTION_NAME_FORMAT = 'NameFormat'
+    _OPTION_NO_TAGS = 'NoTags'
     _OPTION_NUM_CORES = 'NumCores'
+    _OPTION_ONLY_CURRENT_BRANCH = 'OnlyCurrentBranch'
     _OPTION_PATH = 'Path'
     _OPTION_PROFILE = 'Profile'
     _OPTION_PROJECT = 'Project'
@@ -136,8 +139,8 @@ class Configuration(configparser.ConfigParser):
 
         self._ccache_bin_path = self.get(Configuration._SECTION_CCACHE, Configuration._OPTION_BINARY_PATH)
         self._ccache_path = self.get(Configuration._SECTION_CCACHE, Configuration._OPTION_PATH)
-        self._devices_names = self.get(Configuration._SECTION_DEVICES, Configuration._OPTION_LIST).split()
         self._delivery_dir = self.get(Configuration._SECTION_AOSP_FILES, Configuration._OPTION_FINAL_OUTPUT_DIR_NAME)
+        self._devices_names = self.get(Configuration._SECTION_DEVICES, Configuration._OPTION_LIST).split()
         self._dist_dir = self.get(Configuration._SECTION_AOSP_FILES, Configuration._OPTION_DIST_DIR_NAME)
         self._flash_script_path = self.get(Configuration._SECTION_FLASH_SCRIPT, Configuration._OPTION_PATH)
         self._include_in_delivery = self.get(Configuration._SECTION_AOSP_FILES,
@@ -150,7 +153,11 @@ class Configuration(configparser.ConfigParser):
                                              Configuration._OPTION_LOCAL_MANIFEST_FILE_NAME)
         self._profiles_names = self.get(Configuration._SECTION_PROFILES, Configuration._OPTION_LIST).split()
         self._projects_names = self.get(Configuration._SECTION_PROJECTS, Configuration._OPTION_LIST).split()
+        self._repo_depth = self.getint(Configuration._SECTION_REPO, Configuration._OPTION_DEPTH)
         self._repo_groups = self.get(Configuration._SECTION_REPO, Configuration._OPTION_GROUPS).split()
+        self._repo_no_tags = self.getboolean(Configuration._SECTION_REPO, Configuration._OPTION_NO_TAGS)
+        self._repo_only_current_branch = self.getboolean(Configuration._SECTION_REPO,
+                                                         Configuration._OPTION_ONLY_CURRENT_BRANCH)
         self._repo_trace = self.getboolean(Configuration._SECTION_REPO, Configuration._OPTION_TRACE)
         self._shell = self.get(Configuration._SECTION_SHELL, Configuration._OPTION_PATH)
         self._source_env_file = self.get(Configuration._SECTION_AOSP_FILES, Configuration._OPTION_SOURCE_ENV_FILE_NAME)
@@ -227,8 +234,17 @@ class Configuration(configparser.ConfigParser):
     def projects(self) -> List[str]:
         return self._projects_names
 
+    def repo_depth(self) -> int:
+        return self._repo_depth
+
     def repo_groups(self) -> List[str]:
         return self._repo_groups
+
+    def repo_no_tags(self) -> bool:
+        return self._repo_no_tags
+
+    def repo_only_current_branch(self) -> bool:
+        return self._repo_only_current_branch
 
     def repo_trace(self) -> List[str]:
         return self._repo_trace

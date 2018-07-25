@@ -161,7 +161,8 @@ class AOSP(object):
         self._create(configuration, build_options)
         self._fetch_manifest(configuration)
         AOSP._fetch_local_manifest(configuration, local_manifest)
-        RepoAdapter.sync()
+        RepoAdapter.sync(build_options.num_cores(), configuration.repo_only_current_branch(),
+                         configuration.repo_no_tags())
         self._setup_ccache(configuration)
 
     def export_to_delivery_directory(self, configuration: Configuration) -> None:
@@ -252,7 +253,7 @@ class AOSP(object):
 
     def _fetch_manifest(self, configuration: Configuration) -> None:
         RepoAdapter.init(configuration.repository_manifest().get_remote_url(), self._environment.release(),
-                         configuration.repo_groups())
+                         configuration.repo_groups(), configuration.repo_depth())
 
     def _environment_variables(self, configuration: Configuration, java_home: str, num_cores: int) -> dict:
         variables = {
