@@ -25,23 +25,20 @@
 # SOFTWARE.
 #
 
-import random
-import string
+import contextlib
+import os
 
 
-def random_string(min_length=1, max_length=20, uppercase=True, lowercase=True, digits=False, whitespaces=False,
-                  specials=False):
-    characters = ''
-    if uppercase:
-        characters += string.ascii_uppercase
-    if lowercase:
-        characters += string.ascii_lowercase
-    if digits:
-        characters += string.digits
-    if whitespaces:
-        characters += string.whitespace
-    if specials:
-        characters += ''.join(set(string.printable) - set(string.ascii_letters) - set(string.digits)
-                              - set(string.whitespace))
-    assert characters
-    return ''.join(random.choice(characters) for _ in range(random.randint(min_length, max_length)))
+@contextlib.contextmanager
+def set_cwd(cwd: str) -> None:
+    """
+    Change the current working directory for the context scope only.
+
+    :param cwd: new working directory. When leaving the context, the working directory is restored to what it was.
+    """
+    previous_cwd = os.getcwd()
+    try:
+        os.chdir(cwd)
+        yield
+    finally:
+        os.chdir(previous_cwd)

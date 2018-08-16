@@ -47,8 +47,12 @@ class RepoAdapter(object):
         if component_groups:
             cmd.extend(['-g', ','.join(component_groups)])
         if depth:
-            cmd.extend(['--depth', depth])
+            cmd.extend(['--depth', str(depth)])
         subprocess.check_call(cmd)
+
+    @staticmethod
+    def manifest() -> str:
+        return subprocess.check_output([RepoAdapter._REPO, 'manifest']).decode()
 
     @staticmethod
     def sanity_check() -> None:
@@ -58,7 +62,7 @@ class RepoAdapter(object):
             # Exited because the arguments were missing, but the binary exists.
             pass
         except FileNotFoundError:
-            raise RuntimeError('Missing {}'.format(RepoAdapter._REPO))
+            raise EnvironmentError('Missing {}'.format(RepoAdapter._REPO))
 
     @staticmethod
     def sync(num_jobs: int=0, current_branch_only: bool=False, no_tags: bool=False) -> None:

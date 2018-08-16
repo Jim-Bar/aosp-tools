@@ -33,22 +33,16 @@ import xmlindent
 
 from commandline import LocalManifestCommandLineInterface
 from configuration import Configuration
+from sanity import SanityChecks
 from typing import List, TextIO, Union
 
 
 class LocalManifestRef(object):
-    def __init__(self, name: str, is_tag: bool) -> None:
+    def __init__(self, name: str) -> None:
         self._name = name
-        self._is_tag = is_tag
-
-    def is_tag(self) -> bool:
-        return self._is_tag
 
     def name(self) -> str:
         return self._name
-
-    def type(self) -> str:
-        return 'tag' if self._is_tag else 'head'
 
 
 class LocalManifestRemote(object):
@@ -132,11 +126,9 @@ class LocalManifest(object):
                                                                 os.path.basename(temp_directory))
                 configuration.repository_local_manifest().checkout(ref)
 
-            ref_is_tag = specific_ref in configuration.repository_local_manifest().get_tags()
-
-            local_manifest_path = os.path.join(temp_directory, configuration.local_manifest_file())
-            local_manifest_content = LocalManifest._customize_template_file(ref_is_tag, local_manifest_path,
-                                                                            generic_ref, specific_ref)
+            local_manifest_path = os.path.join(temp_directory, configuration.local_manifest_template_file())
+            local_manifest_content = LocalManifest._customize_template_file(local_manifest_path, generic_ref,
+                                                                            specific_ref)
             return LocalManifest.from_string(local_manifest_content)
 
     def projects(self) -> List[LocalManifestProject]:
@@ -154,8 +146,7 @@ class LocalManifest(object):
         for remote in self._remotes:
             remote_element = xml.etree.ElementTree.Element('remote', {
                 'name': remote.name(),
-                'fetch': remote.path(),
-                'alias': 'origin'
+                'fetch': remote.path()
             })
             manifest_node.append(remote_element)
 
@@ -167,11 +158,10 @@ class LocalManifest(object):
                 manifest_node.append(remove_element)
 
             project_element_attributes = {
-                'clone-depth': '{}'.format(1),
                 'name': project.name(),
                 'path': project.path(),
                 'remote': project.remote().name(),
-                'revision': 'refs/{}s/{}'.format(project.ref().type(), project.ref().name())
+                'revision': project.ref().name()
             }
             if project.groups():
                 project_element_attributes['groups'] = ','.join(project.groups())
@@ -186,14 +176,12 @@ class LocalManifest(object):
         xml.etree.ElementTree.ElementTree(manifest_node).write(output_file, encoding='unicode', xml_declaration=True)
 
     @staticmethod
-    def _customize_template_file(ref_is_tag: bool, local_manifest_path: str, generic_ref: str,
-                                 specific_ref: str) -> str:
+    def _customize_template_file(local_manifest_path: str, generic_ref: str, specific_ref: str) -> str:
         with open(local_manifest_path) as local_manifest_file:
             local_manifest_content = local_manifest_file.read()
 
-        local_manifest_content = local_manifest_content.replace('@TYPE@', 'tags' if ref_is_tag else 'heads')
-        local_manifest_content = local_manifest_content.replace('@GENERIC_VERSION@', generic_ref)
-        local_manifest_content = local_manifest_content.replace('@SPECIFIC_VERSION@', specific_ref)
+        local_manifest_content = local_manifest_content.replace('@GENERIC@', generic_ref)
+        local_manifest_content = local_manifest_content.replace('@SPECIFIC@', specific_ref)
 
         return local_manifest_content
 
@@ -238,9 +226,9 @@ class LocalManifest(object):
                 groups = list()
 
             # Get type (branch or tag) and revision name.
-            _, ref_type, ref_name = xml_root_child.attrib['revision'].split('/')
+            ref_name = xml_root_child.attrib['revision'].split('/').pop()
             if ref_name not in refs:
-                refs[ref_name] = LocalManifestRef(ref_name, ref_type == 'tags')
+                refs[ref_name] = LocalManifestRef(ref_name)
             ref = refs[ref_name]
 
             # If the path of the repository is in the list of the removed projects' paths, this means that this
@@ -257,7 +245,9 @@ class LocalManifest(object):
         return LocalManifest(projects, list(refs.values()), list(remotes.values()))
 
 
-def main():
+def main() -> None:
+    SanityChecks.run()
+
     configuration = Configuration.read_configuration()
     cli = LocalManifestCommandLineInterface(configuration)
     local_manifest = LocalManifest.from_revisions(configuration, cli.generic_ref(), cli.ref(), cli.specific_ref())

@@ -28,64 +28,49 @@
 import argparse
 import os
 import re
+import subprocess
 import sys
 
 from configuration import Configuration
 
 
-class AOSPCommandLineInterface(object):
-    def __init__(self, configuration: Configuration) -> None:
-        parser = argparse.ArgumentParser(description='Clone & build an AOSP. Read a local manifest from standard input',
-                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+class CommandLineInterface(object):
+    def press_enter(self) -> bool:
+        if not self._continue_when_prompted():
+            try:
+                input('Press enter to continue...')
+            except KeyboardInterrupt:
+                print('')
+                return False
+        return True
 
-        # Required arguments.
-        required_group = parser.add_argument_group('required arguments')
-        required_group.add_argument('-r', '--release',
-                                    help='Android release tag (e.g. android-8.1.0_r20)',
-                                    required=True,
-                                    default=argparse.SUPPRESS)
-        required_group.add_argument('-v', '--version',
-                                    help='version code of XpertEye (e.g. 4.1.0)',
-                                    required=True,
-                                    default=argparse.SUPPRESS)
+    def _continue_when_prompted(self) -> bool:
+        raise NotImplemented
+
+
+class AOSPBuildCommandLineInterface(CommandLineInterface):
+    def __init__(self, configuration: Configuration) -> None:
+        parser = argparse.ArgumentParser(description='Build an AOSP tree',
+                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
         # Optional arguments.
         parser.add_argument('-c', '--cores',
                             help='number of cores to use; 0 for all cores',
                             default=configuration.default_num_cores(),
                             type=int)
-        parser.add_argument('-d', '--device',
-                            help='device code name',
-                            choices=configuration.devices(),
-                            default=configuration.default_device())
-        parser.add_argument('-f', '--firmwares',
-                            help='Git ref for copy of {}'.format(configuration.repository_firmwares().get_path_name()),
-                            default=configuration.default_specific_ref())
-        parser.add_argument('-n', '--name',
-                            help='named prefix added to the name of the directory of the AOSP',
-                            default=configuration.default_name())
-        parser.add_argument('-p', '--project',
-                            help='project of XpertEye',
-                            choices=configuration.projects(),
-                            default=configuration.default_project())
         parser.add_argument('-w', '--path',
-                            help='path to the AOSP',
+                            help='path to the AOSP tree',
                             default=configuration.default_path())
-        parser.add_argument('-x', '--variant',
+        parser.add_argument('-p', '--product',
+                            help='name of the target product',
+                            default=configuration.default_product())
+        parser.add_argument('-t', '--target',
+                            help='makefile target to build',
+                            default=configuration.default_make_target())
+        parser.add_argument('-u', '--variant',
                             help='build variant',
-                            choices=configuration.profiles(),
-                            default=configuration.default_profile())
-
-        # Constant arguments.
-        parser.add_argument('-b', '--build',
-                            help='build the AOSP',
-                            action='store_true')
-        parser.add_argument('-o', '--ota',
-                            help='build the OTA package',
-                            action='store_true')
-        parser.add_argument('-u', '--update',
-                            help='build the update package',
-                            action='store_true')
+                            choices=configuration.variants(),
+                            default=configuration.default_variant())
         parser.add_argument('-y', '--yes',
                             help='automatically continue when prompted',
                             action='store_true')
@@ -96,7 +81,62 @@ class AOSPCommandLineInterface(object):
             parser.error('-c/--cores must be greater than or equal to zero')
         if not os.path.exists(self.path()):
             parser.error('Path "{}" does not exist'.format(self.path()))
-        if os.path.exists(os.path.join(self.path(), self.name())):
+
+    def make_target(self) -> str:
+        return self._args.target
+
+    def num_cores(self) -> int:
+        if self._args.cores == 0:  # Resolve the real number of available cores.
+            return int(subprocess.check_output(['nproc']))
+        return self._args.cores
+
+    def path(self) -> str:
+        return os.path.realpath(self._args.path)
+
+    def product(self) -> str:
+        return self._args.product
+
+    def variant(self) -> str:
+        return self._args.variant
+
+    def _continue_when_prompted(self) -> bool:
+        return self._args.yes
+
+
+class AOSPTreeCommandLineInterface(CommandLineInterface):
+    def __init__(self, configuration: Configuration) -> None:
+        parser = argparse.ArgumentParser(description='Clone an AOSP tree. Read a local manifest from standard input',
+                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+        # Required arguments.
+        required_group = parser.add_argument_group('required arguments')
+        required_group.add_argument('-r', '--release',
+                                    help='Android release tag (e.g. android-8.1.0_r41)',
+                                    required=True,
+                                    default=argparse.SUPPRESS)
+
+        # Optional arguments.
+        parser.add_argument('-c', '--cores',
+                            help='number of cores to use; 0 for all cores',
+                            default=configuration.default_num_cores(),
+                            type=int)
+        parser.add_argument('-w', '--path',
+                            help='path to the AOSP tree',
+                            default=configuration.default_path())
+        parser.add_argument('-p', '--prefix',
+                            help='prefix added to the name of the directory of the AOSP tree',
+                            default=configuration.default_prefix())
+        parser.add_argument('-y', '--yes',
+                            help='automatically continue when prompted',
+                            action='store_true')
+
+        # Parse and sanity checks.
+        self._args = parser.parse_args()
+        if self.num_cores() < 0:
+            parser.error('-c/--cores must be greater than or equal to zero')
+        if not os.path.exists(os.path.dirname(self.path())):
+            parser.error('Path "{}" does not exist'.format(self.path()))
+        if os.path.exists(self.path()):
             parser.error('Path "{}" already exists'.format(self.path()))
         android_release_tags = {tag for tag in configuration.repository_build().remote_refs()[1]
                                 if bool(re.match('^android-\d\.\d\.\d_r\d\d$', tag))}
@@ -105,50 +145,25 @@ class AOSPCommandLineInterface(object):
         self._local_manifest_string = sys.stdin.read()
         sys.stdin = open('/dev/tty', 'r')  # "Reopen" standard input.
 
-    def build(self) -> bool:
-        return self._args.build
-
-    def continue_when_prompted(self) -> bool:
-        return self._args.yes
-
-    def device(self) -> str:
-        return self._args.device
-
-    def firmwares_ref(self) -> str:
-        return self._args.firmwares
-
     def local_manifest(self) -> str:
         return self._local_manifest_string
 
-    def name(self) -> str:
-        return self._args.name
-
     def num_cores(self) -> int:
+        if self._args.cores == 0:  # Resolve the real number of available cores.
+            return int(subprocess.check_output(['nproc']))
         return self._args.cores
 
-    def ota_package(self) -> bool:
-        return self._args.ota
-
     def path(self) -> str:
-        return os.path.realpath(self._args.path)
-
-    def project(self) -> str:
-        return self._args.project
-
-    def variant(self) -> str:
-        return self._args.variant
+        return os.path.join(os.path.realpath(self._args.path), '{}_{}'.format(self._args.prefix, self.release()))
 
     def release(self) -> str:
         return self._args.release
 
-    def update_package(self) -> bool:
-        return self._args.update
-
-    def version(self) -> str:
-        return self._args.version
+    def _continue_when_prompted(self) -> bool:
+        return self._args.yes
 
 
-class LocalManifestCommandLineInterface(object):
+class LocalManifestCommandLineInterface(CommandLineInterface):
     def __init__(self, configuration: Configuration) -> None:
         parser = argparse.ArgumentParser(description='Fetch a local manifest',
                                          formatter_class=argparse.ArgumentDefaultsHelpFormatter)

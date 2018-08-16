@@ -217,4 +217,4 @@ class Repository(object):
 
     def _check_cloned(self) -> None:
         if not self._clone_path:
-            raise RuntimeError('The repository {} is not cloned'.format(self.get_remote_url()))
+            raise EnvironmentError('The repository {} is not cloned'.format(self.get_remote_url()))

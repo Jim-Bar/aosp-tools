@@ -1,0 +1,28 @@
+{
+  "add_hashtree_footer": {
+    "enchilada": {
+      "algorithm": "NONE",
+      "block_size": 4096,
+      "fec_num_roots": 2,
+      "hash_algorithm": "sha1",
+      "generate_fec": true,
+      "partition_name": "system",
+      "rollback_index": 0,
+      "salt": "8cb7953cb731140ac6c97b78e2b62aa8e63704e3",
+      "setup_as_rootfs_from_kernel": true
+    }
+  },
+  "make_vbmeta_image": {
+    "enchilada": {
+      "algorithm": "SHA256_RSA4096",
+      "include_descriptors_from_image": [
+        "boot.img",
+        "dtbo.img",
+        "system.img",
+        "vendor.img"
+      ],
+      "padding_size": 4096,
+      "rollback_index": 0
+    }
+  }
+}
