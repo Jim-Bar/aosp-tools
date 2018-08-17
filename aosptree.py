@@ -25,8 +25,9 @@
 # SOFTWARE.
 #
 
-import cwdcontext
+import contexts
 import os
+import sys
 import xml.etree.ElementTree
 
 from commandline import AOSPTreeCommandLineInterface
@@ -43,7 +44,7 @@ class AOSPTree(object):
             raise EnvironmentError('Not an AOSP tree: "{}"'.format(path))
 
         self._path = path
-        with cwdcontext.set_cwd(path):
+        with contexts.set_cwd(path):
             self._revision = AOSPTree._find_revision()
 
     def __str__(self) -> str:
@@ -54,7 +55,7 @@ class AOSPTree(object):
               local_manifest: LocalManifest, num_cores: int) -> 'AOSPTree':
         os.mkdir(path)
 
-        with cwdcontext.set_cwd(path):
+        with contexts.set_cwd(path):
             # Setup environment.
             os.environ['REPO_TRACE'] = str(1 if configuration.repo_trace() else 0)
 
@@ -103,6 +104,8 @@ def main() -> None:
     if cli.press_enter():
         AOSPTree.clone(configuration, cli.path(), cli.release(), LocalManifest.from_string(cli.local_manifest()),
                        cli.num_cores())
+    else:
+        sys.exit(os.EX_USAGE)  # Set an error code for canceling chained commands.
 
 
 if __name__ == '__main__':

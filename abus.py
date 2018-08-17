@@ -28,6 +28,7 @@
 import json
 
 from adb import ADBAdapter
+from typing import Dict, Union
 
 
 class ABusAdapter(object):
@@ -40,7 +41,7 @@ class ABusAdapter(object):
     _PARAMS_FORMAT = "params:s='{}'"
 
     @staticmethod
-    def request(module_name, method_name, parameters):
+    def request(module_name: str, method_name: str, parameters: Dict[str]) -> Union[None, Dict[str]]:
         answer = ADBAdapter.shell(ABusAdapter._ABUS, ABusAdapter._METHOD_FORMAT.format(module_name, method_name),
                                   ABusAdapter._PARAMS_FORMAT.format(json.dumps(parameters)))
         if answer.startswith('error'):

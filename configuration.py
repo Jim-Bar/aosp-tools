@@ -26,6 +26,9 @@
 #
 
 import configparser
+import contexts
+import os
+import sys
 import time
 
 from git import Repository
@@ -56,13 +59,16 @@ class Configuration(configparser.ConfigParser):
 
     _OPTION_BINARY_PATH = 'BinaryPath'
     _OPTION_DEPTH = 'Depth'
+    _OPTION_FLASH_SYSTEM_IMAGE_PATH = 'FlashSystemImagePath'
+    _OPTION_FLASH_VBMETA_IMAGE_PATH = 'FlashVBMetaImagePath'
     _OPTION_GENERIC_REF = 'GenericRef'
     _OPTION_GROUPS = 'Groups'
+    _OPTION_HOST_BIN_PATH = 'HostBinPath'
     _OPTION_LIST = 'List'
     _OPTION_TEMPLATE_NAME = 'TemplateName'
     _OPTION_MAKE_TARGET = 'MakeTarget'
     _OPTION_NAME = 'Name'
-    _OPTION_PREFIX_FORMAT = 'PrefixFormat'
+    _OPTION_NAME_FORMAT = 'NameFormat'
     _OPTION_NO_TAGS = 'NoTags'
     _OPTION_NUM_CORES = 'NumCores'
     _OPTION_ONLY_CURRENT_BRANCH = 'OnlyCurrentBranch'
@@ -73,16 +79,22 @@ class Configuration(configparser.ConfigParser):
     _OPTION_SPECIFIC_REF = 'SpecificRef'
     _OPTION_TRACE = 'Trace'
     _OPTION_VARIANT = 'Variant'
+    _OPTION_VERIFY_TIMEOUT_SEC = 'VerifyTimeoutSec'
     _OPTION_URL = 'Url'
     _OPTION_USER = 'User'
 
     def __init__(self, default_config_file_name: str, config_file_names: List[str]) -> None:
         configparser.ConfigParser.__init__(self, interpolation=None)
 
-        with open(default_config_file_name) as default_config_file:
-            self.read_file(default_config_file)
-        self.read(config_file_names)
+        with contexts.set_cwd(os.path.dirname(os.path.realpath(sys.argv[0]))):
+            with open(default_config_file_name) as default_config_file:
+                self.read_file(default_config_file)
+            self.read(config_file_names)
 
+        self._default_flash_system_path = self.get(Configuration._SECTION_COMMAND_LINE_DEFAULTS,
+                                                   Configuration._OPTION_FLASH_SYSTEM_IMAGE_PATH)
+        self._default_flash_vbmeta_path = self.get(Configuration._SECTION_COMMAND_LINE_DEFAULTS,
+                                                   Configuration._OPTION_FLASH_VBMETA_IMAGE_PATH)
         self._default_generic_ref = self.get(Configuration._SECTION_COMMAND_LINE_DEFAULTS,
                                              Configuration._OPTION_GENERIC_REF)
         self._default_make_target = self.get(Configuration._SECTION_COMMAND_LINE_DEFAULTS,
@@ -90,8 +102,8 @@ class Configuration(configparser.ConfigParser):
         self._default_num_cores = self.getint(Configuration._SECTION_COMMAND_LINE_DEFAULTS,
                                               Configuration._OPTION_NUM_CORES)
         self._default_path = self.get(Configuration._SECTION_COMMAND_LINE_DEFAULTS, Configuration._OPTION_PATH)
-        self._default_prefix = time.strftime(self.get(Configuration._SECTION_COMMAND_LINE_DEFAULTS,
-                                                      Configuration._OPTION_PREFIX_FORMAT))
+        self._default_name = time.strftime(self.get(Configuration._SECTION_COMMAND_LINE_DEFAULTS,
+                                                    Configuration._OPTION_NAME_FORMAT))
         self._default_product = self.get(Configuration._SECTION_COMMAND_LINE_DEFAULTS, Configuration._OPTION_PRODUCT)
         self._default_specific_ref = self.get(Configuration._SECTION_COMMAND_LINE_DEFAULTS,
                                               Configuration._OPTION_SPECIFIC_REF)
@@ -127,6 +139,7 @@ class Configuration(configparser.ConfigParser):
 
         self._ccache_bin_path = self.get(Configuration._SECTION_CCACHE, Configuration._OPTION_BINARY_PATH)
         self._ccache_path = self.get(Configuration._SECTION_CCACHE, Configuration._OPTION_PATH)
+        self._host_bin_path = self.get(Configuration._SECTION_AOSP_FILES, Configuration._OPTION_HOST_BIN_PATH)
         self._java_7_path = self.get(Configuration._SECTION_JAVA_7, Configuration._OPTION_PATH)
         self._java_8_path = self.get(Configuration._SECTION_JAVA_8, Configuration._OPTION_PATH)
         self._local_manifest_dir = self.get(Configuration._SECTION_LOCAL_MANIFEST, Configuration._OPTION_PATH)
@@ -144,6 +157,8 @@ class Configuration(configparser.ConfigParser):
         self._source_env_file_path = self.get(Configuration._SECTION_AOSP_FILES,
                                               Configuration._OPTION_SOURCE_ENV_FILE_PATH)
         self._variants_names = self.get(Configuration._SECTION_VARIANTS, Configuration._OPTION_LIST).split()
+        self._verify_timeout_sec = self.getint(Configuration._SECTION_SIGNING_INFO,
+                                               Configuration._OPTION_VERIFY_TIMEOUT_SEC)
 
     @staticmethod
     def read_configuration() -> 'Configuration':
@@ -158,14 +173,20 @@ class Configuration(configparser.ConfigParser):
     def ccache_path(self) -> str:
         return self._ccache_path
 
+    def default_flash_system_path(self) -> str:
+        return self._default_flash_system_path
+
+    def default_flash_vbmeta_path(self) -> str:
+        return self._default_flash_vbmeta_path
+
     def default_generic_ref(self) -> str:
         return self._default_generic_ref
 
-    def default_prefix(self) -> str:
-        return self._default_prefix
-
     def default_make_target(self) -> str:
         return self._default_make_target
+
+    def default_name(self) -> str:
+        return self._default_name
 
     def default_num_cores(self) -> int:
         return self._default_num_cores
@@ -181,6 +202,9 @@ class Configuration(configparser.ConfigParser):
 
     def default_variant(self) -> str:
         return self._default_variant
+
+    def host_bin_path(self) -> str:
+        return self._host_bin_path
 
     def java_home(self, java_version: int) -> str:
         if java_version == 7:
@@ -237,3 +261,6 @@ class Configuration(configparser.ConfigParser):
 
     def variants(self) -> List[str]:
         return self._variants_names
+
+    def verify_timeout_sec(self) -> int:
+        return self._verify_timeout_sec

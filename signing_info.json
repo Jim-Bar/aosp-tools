@@ -22,6 +22,7 @@
         "vendor.img"
       ],
       "padding_size": 4096,
+      "partition_name": "vbmeta",
       "rollback_index": 0
     }
   }

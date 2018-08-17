@@ -25,20 +25,37 @@
 # SOFTWARE.
 #
 
-import contextlib
-import os
+import subprocess
+
+from typing import List
 
 
-@contextlib.contextmanager
-def set_cwd(cwd: str) -> None:
+class FastbootAdapter(object):
     """
-    Change the current working directory for the context scope only.
-
-    :param cwd: new working directory. When leaving the context, the working directory is restored to what it was.
+    Provides utility functions for issuing fastboot commands.
     """
-    previous_cwd = os.getcwd()
-    try:
-        os.chdir(cwd)
-        yield
-    finally:
-        os.chdir(previous_cwd)
+
+    _FASTBOOT = 'fastboot'
+
+    @staticmethod
+    def devices() -> List[str]:
+        return subprocess.check_output([FastbootAdapter._FASTBOOT, 'devices']).decode().strip().splitlines()
+
+    @staticmethod
+    def erase(partition_name: str) -> int:
+        return subprocess.check_call([FastbootAdapter._FASTBOOT, 'erase', partition_name])
+
+    @staticmethod
+    def flash(partition_name: str, image_path: str) -> int:
+        return subprocess.check_call([FastbootAdapter._FASTBOOT, 'flash', partition_name, image_path])
+
+    @staticmethod
+    def reboot(bootloader: bool=False) -> int:
+        cmd = [FastbootAdapter._FASTBOOT, 'reboot']
+        if bootloader:
+            cmd.append('bootloader')
+        return subprocess.check_call(cmd)
+
+    @staticmethod
+    def wipe_userdata() -> int:
+        return subprocess.check_call([FastbootAdapter._FASTBOOT, '-w'])

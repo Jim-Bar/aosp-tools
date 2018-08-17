@@ -25,10 +25,11 @@
 # SOFTWARE.
 #
 
-import cwdcontext
+import contexts
 import os
 import stat
 import subprocess
+import sys
 import tempfile
 import time
 
@@ -40,9 +41,9 @@ from sanity import SanityChecks
 
 class AOSPBuild(object):
     @staticmethod
-    def build(configuration: Configuration, aosp_tree: AOSPTree, product: str, variant: str, make_target: str,
-              num_cores: int) -> None:
-        with cwdcontext.set_cwd(aosp_tree.path()):
+    def build(configuration: Configuration, aosp_tree: AOSPTree, make_target: str, product: str='', variant: str='',
+              num_cores: int=os.cpu_count()) -> None:
+        with contexts.set_cwd(aosp_tree.path()):
             # Setup environment.
             java_version = 8 if int(aosp_tree.revision().split('.')[0][len('android-'):]) >= 7 else 7
             environment_variables = {
@@ -64,7 +65,8 @@ class AOSPBuild(object):
             # Prepare build script.
             shell_script = '#!{}\n'.format(configuration.shell())
             shell_script += 'source {}\n'.format(configuration.source_env_file_path())
-            shell_script += 'lunch {}-{}\n'.format(product, variant)
+            shell_script += 'lunch {}-{}\n'.format(product if product else configuration.default_product(),
+                                                   variant if variant else configuration.default_variant())
             shell_script += 'make {} {}\n'.format('-j{}'.format(num_cores) if num_cores else '', make_target)
 
             # Build.
@@ -107,7 +109,9 @@ def main() -> None:
     print(aosp_tree)
     print(AOSPBuild.description(cli.product(), cli.variant(), cli.make_target(), cli.num_cores()))
     if cli.press_enter():
-        AOSPBuild.build(configuration, aosp_tree, cli.product(), cli.variant(), cli.make_target(), cli.num_cores())
+        AOSPBuild.build(configuration, aosp_tree, cli.make_target(), cli.product(), cli.variant(), cli.num_cores())
+    else:
+        sys.exit(os.EX_USAGE)  # Set an error code for canceling chained commands.
 
 
 if __name__ == '__main__':

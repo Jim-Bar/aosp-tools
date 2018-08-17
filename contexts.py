@@ -25,42 +25,35 @@
 # SOFTWARE.
 #
 
-import subprocess
+import contextlib
+import os
 
-from typing import List
 
-
-class RepoAdapter(object):
+@contextlib.contextmanager
+def set_cwd(cwd: str) -> None:
     """
-    Provides utility functions for issuing repo commands.
+    Change the current working directory for the context scope only.
+
+    :param cwd: new working directory. When leaving the context, the working directory is restored to what it was.
     """
+    previous_cwd = os.getcwd()
+    try:
+        os.chdir(cwd)
+        yield
+    finally:
+        os.chdir(previous_cwd)
 
-    INSTALL_DIRECTORY = '.repo'
 
-    _REPO = 'repo'
+@contextlib.contextmanager
+def append_to_path(path: str) -> None:
+    """
+    Add the provided path to the PATH for the context scope only.
 
-    @staticmethod
-    def init(url: str, ref: str='', component_groups: List[str]=list(), depth: int=0) -> int:
-        cmd = [RepoAdapter._REPO, 'init', '-u', url]
-        if ref:
-            cmd.extend(['-b', ref])
-        if component_groups:
-            cmd.extend(['-g', ','.join(component_groups)])
-        if depth:
-            cmd.extend(['--depth', str(depth)])
-        return subprocess.check_call(cmd)
-
-    @staticmethod
-    def manifest() -> str:
-        return subprocess.check_output([RepoAdapter._REPO, 'manifest']).decode()
-
-    @staticmethod
-    def sync(num_jobs: int=0, current_branch_only: bool=False, no_tags: bool=False) -> int:
-        cmd = [RepoAdapter._REPO, 'sync']
-        if num_jobs:
-            cmd.extend(['-j{}'.format(num_jobs)])
-        if current_branch_only:
-            cmd.extend(['-c', '--no-clone-bundle'])
-        if no_tags:
-            cmd.extend(['--no-tags'])
-        return subprocess.check_call(cmd)
+    :param path: the directory to add to the PATH. When leaving the context, the directory is removed from the PATH.
+    """
+    previous_path = os.environ.get('PATH')
+    try:
+        os.environ['PATH'] = '{}:{}'.format(previous_path, path)
+        yield
+    finally:
+        os.environ['PATH'] = previous_path

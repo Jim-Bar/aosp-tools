@@ -28,17 +28,13 @@
 import os
 import sys
 
-from repo import RepoAdapter
-
 
 class SanityChecks(object):
     @staticmethod
     def run() -> None:
+        if sys.version_info < (3, 5):  # On Python 2 syntax errors will arise before executing this.
+            raise EnvironmentError('Must use Python 3.5+ (current: {}.{})'.format(*sys.version_info))
         if not sys.platform.startswith('linux'):
             raise EnvironmentError('Must be on Linux')
         if os.getuid() == 0:
             raise EnvironmentError('Must not be root')
-        RepoAdapter.sanity_check()
-
-        # TODO: ccache, avbtool, fec
-        # TODO: Python version 3.5+

@@ -28,6 +28,8 @@
 import subprocess
 import time
 
+from typing import List
+
 
 class ADBAdapter(object):
     """
@@ -37,27 +39,38 @@ class ADBAdapter(object):
     _ADB = 'adb'
 
     @staticmethod
-    def pull(*files):
+    def devices() -> List[str]:
+        return subprocess.check_output([ADBAdapter._ADB, 'devices']).decode().strip().splitlines()[1:]
+
+    @staticmethod
+    def pull(*files) -> int:
         return subprocess.check_call([ADBAdapter._ADB, 'pull'] + list(files))
 
     @staticmethod
-    def push(*files):
+    def push(*files) -> int:
         return subprocess.check_call([ADBAdapter._ADB, 'push'] + list(files))
 
     @staticmethod
-    def shell(*args):
-        return subprocess.check_output([ADBAdapter._ADB, 'shell'] + list(args)).strip()
+    def reboot(option: str='') -> int:
+        reboot_options = ['bootloader', 'recovery', 'sideload', 'sideload-auto-reboot']
+        if option and option not in reboot_options:
+            raise ValueError('Invalid reboot option: {}'.format(option))
+        return subprocess.check_call([ADBAdapter._ADB, 'reboot', option])
 
     @staticmethod
-    def wait_for_boot_completed():
+    def shell(*args) -> str:
+        return subprocess.check_output([ADBAdapter._ADB, 'shell'] + list(args)).decode().strip()
+
+    @staticmethod
+    def wait_for_boot_completed() -> None:
         ADBAdapter.wait_for_device()
         while ADBAdapter.shell('getprop', 'sys.boot_completed') != '1':
             time.sleep(1)
 
     @staticmethod
-    def wait_for_device():
+    def wait_for_device() -> int:
         return subprocess.check_call([ADBAdapter._ADB, 'wait-for-device'])
 
     @staticmethod
-    def wait_for_shutdown():
+    def wait_for_shutdown() -> None:
         ADBAdapter.shell()
