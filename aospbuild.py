@@ -64,6 +64,7 @@ class AOSPBuild(object):
 
             # Prepare build script.
             shell_script = '#!{}\n'.format(configuration.shell())
+            shell_script += 'set -e\n'
             shell_script += 'source {}\n'.format(configuration.source_env_file_path())
             shell_script += 'lunch {}-{}\n'.format(product if product else configuration.default_product(),
                                                    variant if variant else configuration.default_variant())
