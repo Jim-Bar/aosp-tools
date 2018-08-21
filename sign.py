@@ -30,6 +30,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 
 from aospbuild import AOSPBuild
 from aosptree import AOSPTree
@@ -44,34 +45,34 @@ class Signer(object):
     _FEC = 'fec'
 
     @staticmethod
-    def sign(configuration: Configuration, aosp_tree: AOSPTree, product_name: str, sparse_image_path: str,
-             key_path: str, other_images_path: str, output_path: str) -> None:
+    def sign(configuration: Configuration, aosp_tree: AOSPTree, product_name: str, image_path: str, key_path: str,
+             other_images_path: str, output_path: str) -> None:
         avb_repository_path = configuration.repository_avb().get_path_name()
         if avb_repository_path.startswith('platform/'):
             avb_repository_path = avb_repository_path[len('platform/'):]  # Path in AOSP.
         avb = AVBToolAdapter(os.path.join(aosp_tree.path(), avb_repository_path))
 
-        with open(configuration.signing_info()) as signing_info_file:
-            signing_info = json.load(signing_info_file)
-            hashtree_info = signing_info['add_hashtree_footer'][product_name]
-            vbmeta_info = signing_info['make_vbmeta_image'][product_name]
+        with contexts.set_cwd(os.path.dirname(os.path.realpath(sys.argv[0]))):
+            with open(configuration.signing_info()) as signing_info_file:
+                signing_info = json.load(signing_info_file)
+                hashtree_info = signing_info['add_hashtree_footer'][product_name]
+                vbmeta_info = signing_info['make_vbmeta_image'][product_name]
 
         # Setup output directory.
-        if os.path.exists(output_path):
-            shutil.rmtree(output_path)
-        os.makedirs(output_path)
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
         # Rename on the fly to make sure the verification does not fail because the image is named differently.
-        shutil.copy(sparse_image_path, os.path.join(output_path, '{}.img'.format(hashtree_info['partition_name'])))
-        sparse_image_path = os.path.join(output_path, os.path.basename(sparse_image_path))
+        signed_image_path = os.path.join(output_path, '{}.img'.format(hashtree_info['partition_name']))
+        shutil.copy(image_path, signed_image_path)
         for image_name in vbmeta_info['include_descriptors_from_image']:
-            if image_name != '{}.img'.format(hashtree_info['partition_name']):  # Do not try to copy the image to sign.
+            if image_name != os.path.basename(signed_image_path):  # Do not try to copy the image to sign.
                 shutil.copy(os.path.join(other_images_path, image_name), output_path)
 
         # Add the hashtree footer to the image.
         with contexts.append_to_path(os.path.join(aosp_tree.path(), configuration.host_bin_path())):
             if hashtree_info['generate_fec']:  # Generate fec if it is needed.
                 Signer._make_fec(configuration, aosp_tree, product_name)
-            avb.add_hashtree_footer(sparse_image_path, hashtree_info['partition_name'], hashtree_info['generate_fec'],
+            avb.add_hashtree_footer(signed_image_path, hashtree_info['partition_name'], hashtree_info['generate_fec'],
                                     hashtree_info['fec_num_roots'], hashtree_info['hash_algorithm'],
                                     hashtree_info['block_size'], hashtree_info['salt'], hashtree_info['algorithm'],
                                     hashtree_info['rollback_index'], hashtree_info['setup_as_rootfs_from_kernel'])
