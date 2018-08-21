@@ -86,10 +86,9 @@ class Configuration(configparser.ConfigParser):
     def __init__(self, default_config_file_name: str, config_file_names: List[str]) -> None:
         configparser.ConfigParser.__init__(self, interpolation=None)
 
-        with contexts.set_cwd(os.path.dirname(os.path.realpath(sys.argv[0]))):
-            with open(default_config_file_name) as default_config_file:
-                self.read_file(default_config_file)
-            self.read(config_file_names)
+        with contexts.open_local(default_config_file_name) as default_config_file:
+            self.read_file(default_config_file)
+        self.read(config_file_names)
 
         self._default_flash_system_path = self.get(Configuration._SECTION_COMMAND_LINE_DEFAULTS,
                                                    Configuration._OPTION_FLASH_SYSTEM_IMAGE_PATH)

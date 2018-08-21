@@ -27,21 +27,7 @@
 
 import contextlib
 import os
-
-
-@contextlib.contextmanager
-def set_cwd(cwd: str) -> None:
-    """
-    Change the current working directory for the context scope only.
-
-    :param cwd: new working directory. When leaving the context, the working directory is restored to what it was.
-    """
-    previous_cwd = os.getcwd()
-    try:
-        os.chdir(cwd)
-        yield
-    finally:
-        os.chdir(previous_cwd)
+import sys
 
 
 @contextlib.contextmanager
@@ -57,3 +43,32 @@ def append_to_path(path: str) -> None:
         yield
     finally:
         os.environ['PATH'] = previous_path
+
+
+@contextlib.contextmanager
+def open_local(*args, **kwargs) -> None:
+    """
+    Open a file located in the calling script's directory. Used as ``open``. This function makes difference only if
+    called with a relative path. It will act exactly as ``open`` if given an absolute path.
+
+    :param args: arguments passed to the built-in ``open``.
+    :param kwargs: keywords arguments passed to the built-in ``open``.
+    """
+    with set_cwd(os.path.dirname(os.path.realpath(sys.argv[0]))):
+        with open(*args, **kwargs) as file_object:
+            yield file_object
+
+
+@contextlib.contextmanager
+def set_cwd(cwd: str) -> None:
+    """
+    Change the current working directory for the context scope only.
+
+    :param cwd: new working directory. When leaving the context, the working directory is restored to what it was.
+    """
+    previous_cwd = os.getcwd()
+    try:
+        os.chdir(cwd)
+        yield
+    finally:
+        os.chdir(previous_cwd)

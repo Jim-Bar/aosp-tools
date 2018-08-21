@@ -52,11 +52,10 @@ class Signer(object):
             avb_repository_path = avb_repository_path[len('platform/'):]  # Path in AOSP.
         avb = AVBToolAdapter(os.path.join(aosp_tree.path(), avb_repository_path))
 
-        with contexts.set_cwd(os.path.dirname(os.path.realpath(sys.argv[0]))):
-            with open(configuration.signing_info()) as signing_info_file:
-                signing_info = json.load(signing_info_file)
-                hashtree_info = signing_info['add_hashtree_footer'][product_name]
-                vbmeta_info = signing_info['make_vbmeta_image'][product_name]
+        with contexts.open_local(configuration.signing_info()) as signing_info_file:
+            signing_info = json.load(signing_info_file)
+            hashtree_info = signing_info['add_hashtree_footer'][product_name]
+            vbmeta_info = signing_info['make_vbmeta_image'][product_name]
 
         # Setup output directory.
         if not os.path.exists(output_path):
