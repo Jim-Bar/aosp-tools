@@ -58,12 +58,19 @@ class LocalManifestRemote(object):
 
 
 class LocalManifestProject(object):
+    def __init__(self, name: str) -> None:
+        self._name = name
+
+    def name(self) -> str:
+        return self._name
+
+
+class LocalManifestAddedProject(LocalManifestProject):
     def __init__(self, name: str, path: str, remote: LocalManifestRemote, groups: List[str], ref: LocalManifestRef,
-                 override: bool, children: List[xml.etree.ElementTree.Element]) -> None:
+                 children: List[xml.etree.ElementTree.Element]) -> None:
+        super().__init__(name)
         self._children = children
         self._groups = groups
-        self._name = name
-        self._override = override
         self._path = path
         self._remote = remote
         self._ref = ref
@@ -73,12 +80,6 @@ class LocalManifestProject(object):
 
     def groups(self) -> List[str]:
         return self._groups
-
-    def name(self) -> str:
-        return self._name
-
-    def override(self) -> bool:
-        return self._override
 
     def path(self) -> str:
         return self._path
@@ -92,9 +93,6 @@ class LocalManifestProject(object):
     def set_groups(self, new_groups: List[str]) -> None:
         self._groups = new_groups
 
-    def set_override(self, new_override: bool) -> None:
-        self._override = new_override
-
     def set_path(self, new_path: str) -> None:
         self._path = new_path
 
@@ -105,13 +103,27 @@ class LocalManifestProject(object):
         self._remote = new_remote
 
 
+class LocalManifestRemovedProject(LocalManifestProject):
+    """
+    Sometimes removed projects' names do not match projects' paths (e.g. the project ``platform/build`` whose path is
+    ``build/make``). Consequently it is sometimes impossible to associate a ``<remove-project>`` element with a
+    ``<project>`` element. That is why removed paths cannot be stored as part of :class:`LocalManifestAddedProject` and
+    need a separate entity, hence this class.
+
+    For now a removed project is no more than a project containing an attribute ``name``, that is why this class adds
+    nothing more to :class:`LocalManifestProject`.
+    """
+    pass
+
+
 class LocalManifest(object):
 
-    def __init__(self, projects: List[LocalManifestProject], refs: List[LocalManifestRef],
-                 remotes: List[LocalManifestRemote]) -> None:
+    def __init__(self, projects: List[LocalManifestAddedProject], refs: List[LocalManifestRef],
+                 remotes: List[LocalManifestRemote], removed_projects: List[LocalManifestRemovedProject]) -> None:
         self._projects = projects
         self._refs = refs
         self._remotes = remotes
+        self._removed_projects = removed_projects
 
     @staticmethod
     def from_file(local_manifest_path: str) -> 'LocalManifest':
@@ -131,7 +143,7 @@ class LocalManifest(object):
                                                                             specific_ref)
             return LocalManifest.from_string(local_manifest_content)
 
-    def projects(self) -> List[LocalManifestProject]:
+    def projects(self) -> List[LocalManifestAddedProject]:
         return self._projects
 
     def refs(self) -> List[LocalManifestRef]:
@@ -150,13 +162,13 @@ class LocalManifest(object):
             })
             manifest_node.append(remote_element)
 
-        for project in self._projects:
-            if project.override():
-                remove_element = xml.etree.ElementTree.Element('remove-project', {
-                    'name': '{}{}'.format('' if project.path().startswith('device/') else 'platform/', project.path())
-                })
-                manifest_node.append(remove_element)
+        for removed_project in self._removed_projects:
+            remove_element = xml.etree.ElementTree.Element('remove-project', {
+                'name': removed_project.name()
+            })
+            manifest_node.append(remove_element)
 
+        for project in self._projects:
             project_element_attributes = {
                 'name': project.name(),
                 'path': project.path(),
@@ -189,16 +201,9 @@ class LocalManifest(object):
     def from_string(local_manifest_content: str) -> 'LocalManifest':
         xml_root = xml.etree.ElementTree.fromstring(local_manifest_content)
 
-        removed_paths = list()
+        removed_projects = list()
         for xml_root_child in xml_root.findall('remove-project'):
-            path = xml_root_child.attrib['name']
-
-            # The path may be prefixed by a component which is not actually part of the path. Remove it.
-            platform_prefix = 'platform/'
-            if path.startswith(platform_prefix):
-                path = path[len(platform_prefix):]
-
-            removed_paths.append(path)
+            removed_projects.append(LocalManifestRemovedProject(xml_root_child.attrib['name']))
 
         refs = dict()
 
@@ -231,18 +236,14 @@ class LocalManifest(object):
                 refs[ref_name] = LocalManifestRef(ref_name)
             ref = refs[ref_name]
 
-            # If the path of the repository is in the list of the removed projects' paths, this means that this
-            # repository overrides another repository. Mark it as such.
-            overrides = xml_root_child.attrib['path'] in removed_paths
-
             # Get children.
             children = list()
             for child in xml_root_child:
                 children.append(child)
 
-            projects.append(LocalManifestProject(name, path, remote, groups, ref, overrides, children))
+            projects.append(LocalManifestAddedProject(name, path, remote, groups, ref, children))
 
-        return LocalManifest(projects, list(refs.values()), list(remotes.values()))
+        return LocalManifest(projects, list(refs.values()), list(remotes.values()), removed_projects)
 
 
 def main() -> None:
