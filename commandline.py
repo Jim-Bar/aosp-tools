@@ -146,7 +146,7 @@ class AOSPTreeCommandLineInterface(CommandLineInterface):
         if self.release() not in android_release_tags:
             parser.error('Android release "{}" does not exist'.format(self.release()))
         self._local_manifest_string = sys.stdin.read()
-        sys.stdin = open('/dev/tty', 'r')  # "Reopen" standard input.
+        sys.stdin = open('/dev/tty', 'r')  # "Reopen" standard input. Required for reading further inputs (key presses).
 
     def local_manifest(self) -> str:
         return self._local_manifest_string

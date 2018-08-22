@@ -414,7 +414,7 @@ class ManifestEditor(object):
 
 
 if __name__ == '__main__':
-    manifest = manifest.LocalManifest.from_revisions(configuration.Configuration.read_configuration(),
+    manifest = manifest.LocalManifest.from_revisions(configuration.Configuration(),
                                                      'generic-int', 'sailfish-7.1.1-int', 'sailfish-7.1.1-int')
     ManifestEditor(manifest).edit()
     manifest.to_file('local_manifest.editor.xml')  # TODO: Well... You know what to do.

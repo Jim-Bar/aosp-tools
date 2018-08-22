@@ -98,7 +98,7 @@ class AOSPTree(object):
 def main() -> None:
     SanityChecks.run()
 
-    configuration = Configuration.read_configuration()
+    configuration = Configuration()
     cli = AOSPTreeCommandLineInterface(configuration)
     print(AOSPTree.description(cli.path(), cli.release()))
     if cli.press_enter():

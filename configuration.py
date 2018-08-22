@@ -27,8 +27,6 @@
 
 import configparser
 import contexts
-import os
-import sys
 import time
 
 from git import Repository
@@ -53,7 +51,6 @@ class Configuration(configparser.ConfigParser):
     _SECTION_REPOSITORY_BUILD = 'RepositoryBuild'
     _SECTION_REPOSITORY_LOCAL_MANIFEST = 'RepositoryLocalManifest'
     _SECTION_REPOSITORY_MANIFEST = 'RepositoryManifest'
-    _SECTION_SHELL = 'Shell'
     _SECTION_SIGNING_INFO = 'SigningInfo'
     _SECTION_VARIANTS = 'Variants'
 
@@ -83,9 +80,11 @@ class Configuration(configparser.ConfigParser):
     _OPTION_URL = 'Url'
     _OPTION_USER = 'User'
 
-    def __init__(self, default_config_file_name: str, config_file_names: List[str]) -> None:
+    def __init__(self) -> None:
         configparser.ConfigParser.__init__(self, interpolation=None)
 
+        default_config_file_name = 'default_config.ini'
+        config_file_names = ['config.ini']
         with contexts.open_local(default_config_file_name) as default_config_file:
             self.read_file(default_config_file)
         self.read(config_file_names)
@@ -151,20 +150,12 @@ class Configuration(configparser.ConfigParser):
         self._repo_only_current_branch = self.getboolean(Configuration._SECTION_REPO,
                                                          Configuration._OPTION_ONLY_CURRENT_BRANCH)
         self._repo_trace = self.getboolean(Configuration._SECTION_REPO, Configuration._OPTION_TRACE)
-        self._shell = self.get(Configuration._SECTION_SHELL, Configuration._OPTION_PATH)
         self._signing_info = self.get(Configuration._SECTION_SIGNING_INFO, Configuration._OPTION_PATH)
         self._source_env_file_path = self.get(Configuration._SECTION_AOSP_FILES,
                                               Configuration._OPTION_SOURCE_ENV_FILE_PATH)
         self._variants_names = self.get(Configuration._SECTION_VARIANTS, Configuration._OPTION_LIST).split()
         self._verify_timeout_sec = self.getint(Configuration._SECTION_SIGNING_INFO,
                                                Configuration._OPTION_VERIFY_TIMEOUT_SEC)
-
-    @staticmethod
-    def read_configuration() -> 'Configuration':
-        # Read the configuration file.
-        default_configuration_file_name = 'default_config.ini'
-        configuration_file_names = ['config.ini']
-        return Configuration(default_configuration_file_name, configuration_file_names)
 
     def ccache_binary_path(self) -> str:
         return self._ccache_bin_path
@@ -248,9 +239,6 @@ class Configuration(configparser.ConfigParser):
 
     def repository_manifest(self) -> Repository:
         return self._repository_manifest
-
-    def shell(self) -> str:
-        return self._shell
 
     def signing_info(self) -> str:
         return self._signing_info

@@ -249,7 +249,7 @@ class LocalManifest(object):
 def main() -> None:
     SanityChecks.run()
 
-    configuration = Configuration.read_configuration()
+    configuration = Configuration()
     cli = LocalManifestCommandLineInterface(configuration)
     local_manifest = LocalManifest.from_revisions(configuration, cli.generic_ref(), cli.ref(), cli.specific_ref())
     local_manifest.to_file(sys.stdout)

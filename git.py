@@ -79,22 +79,26 @@ class _GitUtils(object):
                               stdout=_GitUtils._std(stdout))
 
     @staticmethod
-    def get_branches(working_directory: str, show_remotes: bool=False) -> List[str]:
-        git_branch_command = ['git', 'branch']
-        if show_remotes:
-            git_branch_command.append('-a')
+    def get_branches(working_directory: str) -> Tuple[List[str], List[str]]:
+        # Local branches.
+        git_branches_command = ['git', 'for-each-ref', 'refs/heads']
+        local_branches = subprocess.check_output(git_branches_command, cwd=working_directory).decode().splitlines()
+        local_branches = [item.split()[2].split('/')[-1] for item in local_branches]
 
-        # Local branches have the structure ``* branch_name`` or ``  other_branch_name``.
-        # Remote branches have the structure ``  remotes/origin/branch_name``.
-        # When requesting remote branches, the HEAD is also included: ``  remotes/origin/HEAD -> origin/branch_name``.
-        branches_raw = subprocess.check_output(git_branch_command, cwd=working_directory).decode()
-        return [branch_raw.split()[1] for branch_raw in branches_raw if 'HEAD' not in branch_raw]
+        # Remote branches.
+        git_branches_command = ['git', 'for-each-ref', 'refs/remotes']
+        remote_branches = subprocess.check_output(git_branches_command, cwd=working_directory).decode().splitlines()
+        remote_branches = [item.split()[2].split('/')[-1] for item in remote_branches]
+
+        return local_branches, remote_branches
 
     @staticmethod
     def get_tags(working_directory: str) -> List[str]:
-        git_tag_command = ['git', 'tag']
+        git_tags_command = ['git', 'for-each-ref', 'refs/tags']
+        tags = subprocess.check_output(git_tags_command, cwd=working_directory).decode().splitlines()
+        tags = [item.split()[2].split('/')[-1] for item in tags]
 
-        return subprocess.check_output(git_tag_command, cwd=working_directory).decode().splitlines()
+        return tags
 
     @staticmethod
     def remote_refs(remote_url: str) -> Tuple[List[str], List[str]]:
@@ -122,13 +126,13 @@ class _GitUtils(object):
         # Return the name of the repository. The name is read based on the remote for push, so it may be incorrect.
         # If fetching the remote name fails (the repository does not have a remote, ...), an empty string is returned.
         git_remote_show_command = ['git', 'remote', 'show', '-n', 'origin']
-        with open(os.devnull, 'w') as devnull:
-            try:
-                git_remote_data = subprocess.check_output(git_remote_show_command, cwd=working_directory,
-                                                          stderr=devnull).decode().splitlines()
-            except subprocess.CalledProcessError:
-                # This is probably not a repository. In all cases, the name cannot be found, so return an empty string.
-                return ''
+
+        try:
+            git_remote_data = subprocess.check_output(git_remote_show_command,
+                                                      cwd=working_directory).decode().splitlines()
+        except subprocess.CalledProcessError:
+            # This is probably not a repository. In all cases, the name cannot be found, so return an empty string.
+            return ''
 
         # Parse the remote data to extract the name of the repository.
         git_remote = ''
@@ -179,10 +183,10 @@ class Repository(object):
                         stdout=self._stdout_enabled)
         self._clone_path = os.path.realpath(os.path.join(working_directory, directory_name))
 
-    def get_branches(self, show_remotes: bool=False) -> List[str]:
+    def get_branches(self) -> Tuple[List[str], List[str]]:
         self._check_cloned()
 
-        return _GitUtils.get_branches(self._clone_path, show_remotes)
+        return _GitUtils.get_branches(self._clone_path)
 
     def get_path_name(self) -> str:
         return '{}/{}'.format(self._path, self._name)

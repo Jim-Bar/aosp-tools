@@ -67,7 +67,7 @@ class Flasher(object):
 def main() -> None:
     SanityChecks.run()
 
-    cli = FlasherCommandLineInterface(Configuration.read_configuration())
+    cli = FlasherCommandLineInterface(Configuration())
     print(Flasher.description(cli.system_image_path(), cli.vbmeta_image_path()))
     if cli.press_enter():
         Flasher.flash(cli.system_image_path(), cli.vbmeta_image_path())

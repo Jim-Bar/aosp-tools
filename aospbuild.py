@@ -27,11 +27,8 @@
 
 import contexts
 import os
-import stat
 import subprocess
 import sys
-import tempfile
-import time
 
 from aosptree import AOSPTree
 from commandline import AOSPBuildCommandLineInterface
@@ -63,7 +60,7 @@ class AOSPBuild(object):
                 subprocess.check_call([configuration.ccache_binary_path(), '-M', '50G'])
 
             # Prepare build script.
-            shell_script = '#!{}\n'.format(configuration.shell())
+            shell_script = '#!/usr/bin/env bash\n'
             shell_script += 'set -e\n'
             shell_script += 'source {}\n'.format(configuration.source_env_file_path())
             shell_script += 'lunch {}-{}\n'.format(product if product else configuration.default_product(),
@@ -71,7 +68,7 @@ class AOSPBuild(object):
             shell_script += 'make {} {}\n'.format('-j{}'.format(num_cores) if num_cores else '', make_target)
 
             # Build.
-            AOSPBuild._exec_shell_script(shell_script)
+            subprocess.run(['bash'], input=shell_script, check=True)
 
     @staticmethod
     def description(product: str, variant: str, make_target: str, num_cores: int) -> str:
@@ -85,26 +82,11 @@ class AOSPBuild(object):
 
         return '\n'.join(description)
 
-    @staticmethod
-    def _exec_shell_script(shell_script_content: str) -> None:
-        file_path = os.path.join(tempfile.gettempdir(), 'build-{}.sh'.format(int(time.time())))
-        try:
-            with open(file_path, 'x') as make_build_file:
-                make_build_file.write(shell_script_content)
-            os.chmod(file_path, os.stat(file_path).st_mode | stat.S_IEXEC)
-            subprocess.check_call([file_path])
-        finally:
-            # Ensure the file is always deleted.
-            try:
-                os.remove(file_path)
-            except FileNotFoundError:
-                pass
-
 
 def main() -> None:
     SanityChecks.run()
 
-    configuration = Configuration.read_configuration()
+    configuration = Configuration()
     cli = AOSPBuildCommandLineInterface(configuration)
     aosp_tree = AOSPTree(configuration, cli.path())
     print(aosp_tree)

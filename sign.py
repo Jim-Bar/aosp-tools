@@ -30,7 +30,6 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 
 from aospbuild import AOSPBuild
 from aosptree import AOSPTree
@@ -105,7 +104,7 @@ class Signer(object):
 def main() -> None:
     SanityChecks.run()
 
-    configuration = Configuration.read_configuration()
+    configuration = Configuration()
     cli = SignerCommandLineInterface(configuration)
     Signer.sign(configuration, AOSPTree(configuration, cli.path()), cli.product(), cli.image_path(), cli.key_path(),
                 cli.other_images_path(), cli.output_path())
