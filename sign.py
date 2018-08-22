@@ -51,6 +51,18 @@ class Signer(object):
             avb_repository_path = avb_repository_path[len('platform/'):]  # Path in AOSP.
         avb = AVBToolAdapter(os.path.join(aosp_tree.path(), avb_repository_path))
 
+        # Check that the image does not already contain a hashtree / footer.
+        try:
+            avb.info_image(image_path)
+            # If the command returns without raising an exception, it means the image has a hashtree / footer.
+            raise ValueError('The image {} is already signed. If you want to erase its signing information, use avbtool'
+                             .format(image_path))
+        except subprocess.CalledProcessError:
+            # Note that it is not possible to find out whether the failure happened because there is no vbmeta
+            # information (what we want to check here) or because of another cause, apart from analysing stderr.
+            pass
+
+        # Get signing information.
         with contexts.open_local(configuration.signing_info()) as signing_info_file:
             signing_info = json.load(signing_info_file)
             hashtree_info = signing_info['add_hashtree_footer'][product_name]

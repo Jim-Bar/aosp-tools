@@ -85,6 +85,15 @@ class AVBToolAdapter(object):
 
         return subprocess.check_call(cmd)
 
+    def info_image(self, image_path: str) -> str:
+        """
+        Read the vbmeta and footer information of an image. Refer to ``avbtool`` for more information.
+
+        :param image_path: path to the image to read.
+        :return: the image information as returned by ``avbtool``.
+        """
+        return subprocess.check_output([self._avbtool_path, 'info_image', '--image', image_path]).decode()
+
     def make_vbmeta_image(self, vbmeta_image_path: str, algorithm: str, key_path: str, rollback_index: int,
                           descriptors_from_image: List[str], padding_size: int) -> int:
         cmd = [
