@@ -259,7 +259,7 @@ class SignerCommandLineInterface(CommandLineInterface):
                             help='path to the directory containing the other images used for generating vbmeta',
                             default=configuration.default_path())
         parser.add_argument('-o', '--output',
-                            help='path to the output directory (will be emptied if it already exists)',
+                            help='path to the output directory (existing images will be overwritten)',
                             default=configuration.default_path())
         parser.add_argument('-w', '--path',
                             help='path to the AOSP tree',
