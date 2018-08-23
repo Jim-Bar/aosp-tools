@@ -37,11 +37,12 @@ from sanity import SanityChecks
 
 
 class AOSPBuild(object):
-    def __init__(self, make_target: str, product: str, variant: str, num_cores: int=os.cpu_count()) -> None:
+    def __init__(self, configuration: Configuration, make_target: str, product: str='', variant: str='',
+                 num_cores: int=os.cpu_count()) -> None:
         self._make_target = make_target
         self._num_cores = num_cores
-        self._product = product
-        self._variant = variant
+        self._product = product if product else configuration.default_product()
+        self._variant = variant if variant else configuration.default_variant()
 
     def __str__(self) -> str:
         return AOSPBuild.description(self._product, self._variant, self._make_target, self._num_cores)
@@ -57,8 +58,7 @@ class AOSPBuild(object):
             # Prepare build script.
             shell_script = 'set -e\n'
             shell_script += 'source {}\n'.format(configuration.source_env_file_path())
-            shell_script += 'lunch {}-{}\n'.format(self._product if self._product else configuration.default_product(),
-                                                   self._variant if self._variant else configuration.default_variant())
+            shell_script += 'lunch {}-{}\n'.format(self._product, self._variant)
             shell_script += 'make {} {}\n'.format('-j{}'.format(self._num_cores) if self._num_cores else '',
                                                   self._make_target)
 
@@ -93,7 +93,7 @@ def main() -> None:
     configuration = Configuration()
     cli = AOSPBuildCommandLineInterface(configuration)
     aosp_tree = AOSPTree(configuration, cli.path())
-    aosp_build = AOSPBuild(cli.make_target(), cli.product(), cli.variant(), cli.num_cores())
+    aosp_build = AOSPBuild(configuration, cli.make_target(), cli.product(), cli.variant(), cli.num_cores())
     print(aosp_tree)
     print(aosp_build)
     if cli.press_enter():

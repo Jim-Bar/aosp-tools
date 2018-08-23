@@ -110,7 +110,7 @@ class Signer(object):
             return
         except FileNotFoundError:
             # The binary does not exist, make it.
-            AOSPBuild.build(configuration, aosp_tree, Signer._FEC, product_name)
+            AOSPBuild(configuration, Signer._FEC, product_name).build(configuration, aosp_tree)
 
 
 def main() -> None:
