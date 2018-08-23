@@ -40,6 +40,13 @@ from sanity import SanityChecks
 
 
 class Signer(object):
+    """
+    Sign a ``system`` image and generate the corresponding ``vbmeta`` image. Note that the ``vbmeta`` image is generated
+    for the built ``system`` image **and** for the provided stock images (refer to the file ``signing_info.json`` for
+    more information.
+
+    For more understanding you may refer to: https://android.googlesource.com/platform/external/avb.
+    """
 
     _FEC = 'fec'
 

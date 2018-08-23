@@ -117,6 +117,10 @@ class LocalManifestRemovedProject(LocalManifestProject):
 
 
 class LocalManifest(object):
+    """
+    Read a local manifest or template of local manifest from a file, from a repository or from a string. Then output it
+    back to a file.
+    """
 
     def __init__(self, projects: List[LocalManifestAddedProject], refs: List[LocalManifestRef],
                  remotes: List[LocalManifestRemote], removed_projects: List[LocalManifestRemovedProject]) -> None:

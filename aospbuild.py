@@ -37,6 +37,10 @@ from sanity import SanityChecks
 
 
 class AOSPBuild(object):
+    """
+    An :class:`AOSPBuild` is a set of AOSP build rules. Use it for building any :class:`aosptree.AOSPTree`.
+    """
+
     def __init__(self, configuration: Configuration, make_target: str, product: str='', variant: str='',
                  num_cores: int=os.cpu_count()) -> None:
         self._make_target = make_target

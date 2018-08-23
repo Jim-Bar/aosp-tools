@@ -36,6 +36,11 @@ from sanity import SanityChecks
 
 
 class Flasher(object):
+    """
+    Flash a ``system`` image and its ``vbmeta`` image on a device. It is meant for signed GSIs along with stock images.
+    Note that this will wipe all the user data.
+    """
+
     @staticmethod
     def flash(system_image_path: str, vbmeta_image_path: str) -> None:
         if ADBAdapter.devices():

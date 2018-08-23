@@ -38,6 +38,12 @@ from sanity import SanityChecks
 
 
 class AOSPTree(object):
+    """
+    An :class:`AOSPTree` basically is the path to an AOSP source tree for a given release of Android. Note that it only
+    represents the source files, and not the built files. It can be fed to a :class:`aospbuild.AOSPBuild` for actually
+    building the sources.
+    """
+
     def __init__(self, configuration: Configuration, path: str) -> None:
         path = os.path.abspath(path)
         if not os.path.isfile(os.path.join(path, configuration.source_env_file_path())):
