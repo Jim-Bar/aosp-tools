@@ -60,8 +60,7 @@ class AOSPBuild(object):
                 subprocess.check_call([configuration.ccache_binary_path(), '-M', '50G'])
 
             # Prepare build script.
-            shell_script = '#!/usr/bin/env bash\n'
-            shell_script += 'set -e\n'
+            shell_script = 'set -e\n'
             shell_script += 'source {}\n'.format(configuration.source_env_file_path())
             shell_script += 'lunch {}-{}\n'.format(product if product else configuration.default_product(),
                                                    variant if variant else configuration.default_variant())
