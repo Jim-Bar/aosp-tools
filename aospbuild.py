@@ -37,9 +37,16 @@ from sanity import SanityChecks
 
 
 class AOSPBuild(object):
-    @staticmethod
-    def build(configuration: Configuration, aosp_tree: AOSPTree, make_target: str, product: str='', variant: str='',
-              num_cores: int=os.cpu_count()) -> None:
+    def __init__(self, make_target: str, product: str, variant: str, num_cores: int=os.cpu_count()) -> None:
+        self._make_target = make_target
+        self._num_cores = num_cores
+        self._product = product
+        self._variant = variant
+
+    def __str__(self) -> str:
+        return AOSPBuild.description(self._product, self._variant, self._make_target, self._num_cores)
+
+    def build(self, configuration: Configuration, aosp_tree: AOSPTree) -> None:
         with contexts.set_cwd(aosp_tree.path()):
             # Setup CCache.
             if not os.path.exists(configuration.ccache_path()):
@@ -50,9 +57,10 @@ class AOSPBuild(object):
             # Prepare build script.
             shell_script = 'set -e\n'
             shell_script += 'source {}\n'.format(configuration.source_env_file_path())
-            shell_script += 'lunch {}-{}\n'.format(product if product else configuration.default_product(),
-                                                   variant if variant else configuration.default_variant())
-            shell_script += 'make {} {}\n'.format('-j{}'.format(num_cores) if num_cores else '', make_target)
+            shell_script += 'lunch {}-{}\n'.format(self._product if self._product else configuration.default_product(),
+                                                   self._variant if self._variant else configuration.default_variant())
+            shell_script += 'make {} {}\n'.format('-j{}'.format(self._num_cores) if self._num_cores else '',
+                                                  self._make_target)
 
             # Setup environment then build.
             java_version = 8 if int(aosp_tree.revision().split('.')[0][len('android-'):]) >= 7 else 7
@@ -85,10 +93,11 @@ def main() -> None:
     configuration = Configuration()
     cli = AOSPBuildCommandLineInterface(configuration)
     aosp_tree = AOSPTree(configuration, cli.path())
+    aosp_build = AOSPBuild(cli.make_target(), cli.product(), cli.variant(), cli.num_cores())
     print(aosp_tree)
-    print(AOSPBuild.description(cli.product(), cli.variant(), cli.make_target(), cli.num_cores()))
+    print(aosp_build)
     if cli.press_enter():
-        AOSPBuild.build(configuration, aosp_tree, cli.make_target(), cli.product(), cli.variant(), cli.num_cores())
+        aosp_build.build(configuration, aosp_tree)
     else:
         sys.exit(os.EX_USAGE)  # Set an error code for canceling chained commands.
 
