@@ -56,22 +56,21 @@ class AOSPTree(object):
         os.mkdir(path)
 
         with contexts.set_cwd(path):
-            # Setup environment.
-            os.environ['REPO_TRACE'] = str(1 if configuration.repo_trace() else 0)
+            with contexts.set_variable('REPO_TRACE', str(1 if configuration.repo_trace() else 0)):
+                # Repo init.
+                RepoAdapter.init(configuration.repository_manifest().get_remote_url(), revision,
+                                 configuration.repo_groups(), configuration.repo_depth())
 
-            # Repo init.
-            RepoAdapter.init(configuration.repository_manifest().get_remote_url(), revision,
-                             configuration.repo_groups(), configuration.repo_depth())
+                # Fetch local manifest.
+                local_manifest_path = os.path.join(RepoAdapter.INSTALL_DIRECTORY,
+                                                   configuration.local_manifest_directory())
+                os.mkdir(local_manifest_path)
+                local_manifest.to_file(os.path.join(local_manifest_path, configuration.local_manifest_file()))
 
-            # Fetch local manifest.
-            local_manifest_path = os.path.join(RepoAdapter.INSTALL_DIRECTORY, configuration.local_manifest_directory())
-            os.mkdir(local_manifest_path)
-            local_manifest.to_file(os.path.join(local_manifest_path, configuration.local_manifest_file()))
+                # Repo sync.
+                RepoAdapter.sync(num_cores, configuration.repo_only_current_branch(), configuration.repo_no_tags())
 
-            # Repo sync.
-            RepoAdapter.sync(num_cores, configuration.repo_only_current_branch(), configuration.repo_no_tags())
-
-            return AOSPTree(configuration, path)
+                return AOSPTree(configuration, path)
 
     @staticmethod
     def description(path: str, revision: str) -> str:

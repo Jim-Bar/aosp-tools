@@ -41,18 +41,6 @@ class AOSPBuild(object):
     def build(configuration: Configuration, aosp_tree: AOSPTree, make_target: str, product: str='', variant: str='',
               num_cores: int=os.cpu_count()) -> None:
         with contexts.set_cwd(aosp_tree.path()):
-            # Setup environment.
-            java_version = 8 if int(aosp_tree.revision().split('.')[0][len('android-'):]) >= 7 else 7
-            environment_variables = {
-                'CCACHE_DIR': configuration.ccache_path(),
-                'JAVA_HOME': configuration.java_home(java_version),
-                'USE_CCACHE_DIR': 1 if configuration.ccache_path() else 0
-            }
-            for variable, value in environment_variables.items():
-                os.environ[variable] = str(value)
-            if 'NDK_ROOT' in os.environ:
-                del os.environ['NDK_ROOT']  # If NDK_ROOT is defined, the build system will try to build it (and fail).
-
             # Setup CCache.
             if not os.path.exists(configuration.ccache_path()):
                 os.mkdir(configuration.ccache_path())
@@ -66,8 +54,17 @@ class AOSPBuild(object):
                                                    variant if variant else configuration.default_variant())
             shell_script += 'make {} {}\n'.format('-j{}'.format(num_cores) if num_cores else '', make_target)
 
-            # Build.
-            subprocess.run(['bash'], input=shell_script.encode(), check=True)
+            # Setup environment then build.
+            java_version = 8 if int(aosp_tree.revision().split('.')[0][len('android-'):]) >= 7 else 7
+            environment_variables = {
+                'CCACHE_DIR': configuration.ccache_path(),
+                'JAVA_HOME': configuration.java_home(java_version),
+                'USE_CCACHE_DIR': str(1 if configuration.ccache_path() else 0)
+            }
+            with contexts.set_variables(environment_variables):
+                # If NDK_ROOT is defined, the build system will try to build it (and fail).
+                with contexts.unset_variable('NDK_ROOT'):
+                    subprocess.run(['bash'], input=shell_script.encode(), check=True)
 
     @staticmethod
     def description(product: str, variant: str, make_target: str, num_cores: int) -> str:

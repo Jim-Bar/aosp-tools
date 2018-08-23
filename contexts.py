@@ -29,6 +29,47 @@ import contextlib
 import os
 import sys
 
+from typing import Dict, List
+
+
+@contextlib.contextmanager
+def set_variable(variable: str, value: str) -> None:
+    """
+    Add the provided variable to the environment for the context scope only. If the variable is already defined, it will
+    be overwritten.
+
+    :param variable: name of the variable to set.
+    :param value: value for the variable. When leaving the context, the value of the variable is restored.
+    """
+    with set_variables({variable: value}):
+        yield
+
+
+@contextlib.contextmanager
+def set_variables(variables: Dict[str, str]) -> None:
+    """
+    Add the provided variables to the environment for the context scope only. If some variables are already defined,
+    they will be overwritten.
+
+    :param variables: a dictionary containing the variables' names as keys, and their new values as values. When leaving
+                      the context, the values of the variables are restored.
+    """
+    previous_variables = dict()
+    for variable in variables:
+        previous_variables[variable] = os.environ.get(variable)
+    try:
+        for variable, value in variables.items():
+            os.environ[variable] = value
+        yield
+    finally:
+        for variable in variables:
+            # None means the variable was not defined at all. If an exception arises in the try block, the variable
+            # could not be in the environment, so we have to check for that as well.
+            if variable in os.environ and previous_variables[variable] is None:
+                del os.environ[variable]
+            else:
+                os.environ[variable] = previous_variables[variable]
+
 
 @contextlib.contextmanager
 def append_to_path(path: str) -> None:
@@ -37,12 +78,8 @@ def append_to_path(path: str) -> None:
 
     :param path: the directory to add to the PATH. When leaving the context, the directory is removed from the PATH.
     """
-    previous_path = os.environ.get('PATH')
-    try:
-        os.environ['PATH'] = '{}:{}'.format(previous_path, path)
+    with set_variable('PATH', '{}:{}'.format(os.environ.get('PATH'), path)):
         yield
-    finally:
-        os.environ['PATH'] = previous_path
 
 
 @contextlib.contextmanager
@@ -72,3 +109,37 @@ def set_cwd(cwd: str) -> None:
         yield
     finally:
         os.chdir(previous_cwd)
+
+
+@contextlib.contextmanager
+def unset_variable(variable: str) -> None:
+    """
+    Unset the provided variable for the context scope only. It has no effect if the variable is not already defined.
+
+    :param variable: name of the variable to unset. When leaving the context, the variable is restored.
+    """
+    with unset_variables([variable]):
+        yield
+
+
+@contextlib.contextmanager
+def unset_variables(variables: List[str]) -> None:
+    """
+    Unset the provided variables for the context scope only. It has no effect on variables which are not already
+    defined.
+
+    :param variables: list of the variables to unset. When leaving the context, the variables are restored to what they
+                      were.
+    """
+    previous_variables = dict()
+    for variable in variables:
+        previous_variables[variable] = os.environ.get(variable)
+    try:
+        for variable in variables:
+            if previous_variables[variable] is not None:  # None means the variable was not defined at all.
+                del os.environ[variable]
+        yield
+    finally:
+        for variable in variables:
+            if previous_variables[variable] is not None:
+                os.environ[variable] = previous_variables[variable]
