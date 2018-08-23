@@ -68,7 +68,7 @@ class AOSPBuild(object):
             shell_script += 'make {} {}\n'.format('-j{}'.format(num_cores) if num_cores else '', make_target)
 
             # Build.
-            subprocess.run(['bash'], input=shell_script, check=True)
+            subprocess.run(['bash'], input=shell_script.encode(), check=True)
 
     @staticmethod
     def description(product: str, variant: str, make_target: str, num_cores: int) -> str:
