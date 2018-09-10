@@ -42,7 +42,7 @@ class AOSPBuild(object):
     """
 
     def __init__(self, configuration: Configuration, make_target: str, product: str='', variant: str='',
-                 num_cores: int=os.cpu_count()) -> None:
+                 num_cores: int=0) -> None:
         self._make_target = make_target
         self._num_cores = num_cores
         self._product = product if product else configuration.default_product()
@@ -63,8 +63,7 @@ class AOSPBuild(object):
             shell_script = 'set -e\n'
             shell_script += 'source {}\n'.format(configuration.source_env_file_path())
             shell_script += 'lunch {}-{}\n'.format(self._product, self._variant)
-            shell_script += 'make {} {}\n'.format('-j{}'.format(self._num_cores) if self._num_cores else '',
-                                                  self._make_target)
+            shell_script += 'make -j {} {}\n'.format(self._num_cores if self._num_cores else '', self._make_target)
 
             # Setup environment then build.
             java_version = 8 if int(aosp_tree.revision().split('.')[0][len('android-'):]) >= 7 else 7
