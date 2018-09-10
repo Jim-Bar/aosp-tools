@@ -44,9 +44,9 @@ class AOSPTree(object):
     building the sources.
     """
 
-    def __init__(self, configuration: Configuration, path: str) -> None:
+    def __init__(self, path: str) -> None:
         path = os.path.abspath(path)
-        if not os.path.isfile(os.path.join(path, configuration.source_env_file_path())):
+        if not os.path.isfile(os.path.join(path, 'build/make/core/main.mk')):
             raise EnvironmentError('Not an AOSP tree: "{}"'.format(path))
 
         self._path = path
@@ -76,7 +76,7 @@ class AOSPTree(object):
                 # Repo sync.
                 RepoAdapter.sync(num_cores, configuration.repo_only_current_branch(), configuration.repo_no_tags())
 
-                return AOSPTree(configuration, path)
+                return AOSPTree(path)
 
     @staticmethod
     def description(path: str, revision: str) -> str:

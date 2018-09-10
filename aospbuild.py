@@ -41,8 +41,10 @@ class AOSPBuild(object):
     An :class:`AOSPBuild` is a set of AOSP build rules. Use it for building any :class:`aosptree.AOSPTree`.
     """
 
+    _BUILDSPEC_FILE_NAME = 'buildspec.mk'
+
     def __init__(self, configuration: Configuration, make_target: str, product: str='', variant: str='',
-                 num_cores: int=0) -> None:
+                 num_cores: int=os.cpu_count()) -> None:
         self._make_target = make_target
         self._num_cores = num_cores
         self._product = product if product else configuration.default_product()
@@ -59,23 +61,20 @@ class AOSPBuild(object):
             if len(next(os.walk(configuration.ccache_path()))[-1]) == 0:  # If there are no files, CCache is not set up.
                 subprocess.check_call([configuration.ccache_binary_path(), '-M', '50G'])
 
-            # Prepare build script.
-            shell_script = 'set -e\n'
-            shell_script += 'source {}\n'.format(configuration.source_env_file_path())
-            shell_script += 'lunch {}-{}\n'.format(self._product, self._variant)
-            shell_script += 'make -j {} {}\n'.format(self._num_cores if self._num_cores else '', self._make_target)
-
             # Setup environment then build.
-            java_version = 8 if int(aosp_tree.revision().split('.')[0][len('android-'):]) >= 7 else 7
             environment_variables = {
                 'CCACHE_DIR': configuration.ccache_path(),
-                'JAVA_HOME': configuration.java_home(java_version),
                 'USE_CCACHE_DIR': str(1 if configuration.ccache_path() else 0)
             }
-            with contexts.set_variables(environment_variables):
-                # If NDK_ROOT is defined, the build system will try to build it (and fail).
-                with contexts.unset_variable('NDK_ROOT'):
-                    subprocess.run(['bash'], input=shell_script.encode(), check=True)
+            build_command = ['make', self._make_target, '-j', str(self._num_cores)]
+            self._generate_buildspec(aosp_tree)
+            try:
+                with contexts.set_variables(environment_variables):
+                    # If NDK_ROOT is defined, the build system will try to build it (and fail).
+                    with contexts.unset_variable('NDK_ROOT'):
+                        subprocess.check_call(build_command)
+            finally:
+                AOSPBuild._clean_buildspec(aosp_tree)
 
     @staticmethod
     def description(product: str, variant: str, make_target: str, num_cores: int) -> str:
@@ -89,13 +88,36 @@ class AOSPBuild(object):
 
         return '\n'.join(description)
 
+    @staticmethod
+    def _clean_buildspec(aosp_tree: AOSPTree) -> None:
+        if os.path.isfile(os.path.join(aosp_tree.path(), AOSPBuild._BUILDSPEC_FILE_NAME)):
+            os.remove(os.path.join(aosp_tree.path(), AOSPBuild._BUILDSPEC_FILE_NAME))
+
+    def _generate_buildspec(self, aosp_tree: AOSPTree) -> None:
+        """
+        Generate the ``buildspec.mk`` file for building without sourcing the environment file nor calling ``lunch``, as
+        advised there: https://android.googlesource.com/platform/build/+/master/Changes.md
+
+        :param aosp_tree: an instance of an AOSP tree.
+        """
+        buildspec_vars = {
+            'TARGET_PRODUCT': self._product,
+            'TARGET_BUILD_VARIANT': self._variant,
+            'BUILD_ENV_SEQUENCE_NUMBER': 13  # Refer to build/buildspec.mk.default
+        }
+        buildspec_content = '\n'.join(['{}:={}'.format(name, value) for name, value in buildspec_vars.items()])
+
+        # Avoid conflicting with existing user configuration by checking that the file does not exist.
+        with open(os.path.join(aosp_tree.path(), AOSPBuild._BUILDSPEC_FILE_NAME), 'x') as buildspec_file:
+            buildspec_file.write(buildspec_content)
+
 
 def main() -> None:
     SanityChecks.run()
 
     configuration = Configuration()
     cli = AOSPBuildCommandLineInterface(configuration)
-    aosp_tree = AOSPTree(configuration, cli.path())
+    aosp_tree = AOSPTree(cli.path())
     aosp_build = AOSPBuild(configuration, cli.make_target(), cli.product(), cli.variant(), cli.num_cores())
     print(aosp_tree)
     print(aosp_build)

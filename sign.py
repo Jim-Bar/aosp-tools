@@ -39,6 +39,8 @@ from configuration import Configuration
 from sanity import SanityChecks
 
 
+# TODO: generate avbtool and then use it from out/host/... instead of using the one in external/avb/...
+# TODO: Before doing that, make sure this script is still needed.
 class Signer(object):
     """
     Sign a ``system`` image and generate the corresponding ``vbmeta`` image. Note that the ``vbmeta`` image is generated
@@ -125,7 +127,7 @@ def main() -> None:
 
     configuration = Configuration()
     cli = SignerCommandLineInterface(configuration)
-    Signer.sign(configuration, AOSPTree(configuration, cli.path()), cli.product(), cli.image_path(), cli.key_path(),
+    Signer.sign(configuration, AOSPTree(cli.path()), cli.product(), cli.image_path(), cli.key_path(),
                 cli.other_images_path(), cli.output_path())
 
 

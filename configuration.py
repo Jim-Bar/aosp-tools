@@ -43,8 +43,6 @@ class Configuration(configparser.ConfigParser):
     _SECTION_CCACHE = 'CCache'
     _SECTION_GITAMA = 'Gitama'
     _SECTION_GOOGLE_SOURCE = 'GoogleSource'
-    _SECTION_JAVA_7 = 'Java7'
-    _SECTION_JAVA_8 = 'Java8'
     _SECTION_LOCAL_MANIFEST = 'LocalManifest'
     _SECTION_REPO = 'Repo'
     _SECTION_REPOSITORY_AVB = 'RepositoryAvb'
@@ -72,7 +70,6 @@ class Configuration(configparser.ConfigParser):
     _OPTION_PATH = 'Path'
     _OPTION_PRODUCT = 'Product'
     _OPTION_PROTOCOL = 'Protocol'
-    _OPTION_SOURCE_ENV_FILE_PATH = 'SourceEnvFilePath'
     _OPTION_SPECIFIC_REF = 'SpecificRef'
     _OPTION_TRACE = 'Trace'
     _OPTION_VARIANT = 'Variant'
@@ -138,8 +135,6 @@ class Configuration(configparser.ConfigParser):
         self._ccache_bin_path = self.get(Configuration._SECTION_CCACHE, Configuration._OPTION_BINARY_PATH)
         self._ccache_path = self.get(Configuration._SECTION_CCACHE, Configuration._OPTION_PATH)
         self._host_bin_path = self.get(Configuration._SECTION_AOSP_FILES, Configuration._OPTION_HOST_BIN_PATH)
-        self._java_7_path = self.get(Configuration._SECTION_JAVA_7, Configuration._OPTION_PATH)
-        self._java_8_path = self.get(Configuration._SECTION_JAVA_8, Configuration._OPTION_PATH)
         self._local_manifest_dir = self.get(Configuration._SECTION_LOCAL_MANIFEST, Configuration._OPTION_PATH)
         self._local_manifest_file = self.get(Configuration._SECTION_LOCAL_MANIFEST, Configuration._OPTION_NAME)
         self._local_manifest_template_file = self.get(Configuration._SECTION_LOCAL_MANIFEST,
@@ -151,8 +146,6 @@ class Configuration(configparser.ConfigParser):
                                                          Configuration._OPTION_ONLY_CURRENT_BRANCH)
         self._repo_trace = self.getboolean(Configuration._SECTION_REPO, Configuration._OPTION_TRACE)
         self._signing_info = self.get(Configuration._SECTION_SIGNING_INFO, Configuration._OPTION_PATH)
-        self._source_env_file_path = self.get(Configuration._SECTION_AOSP_FILES,
-                                              Configuration._OPTION_SOURCE_ENV_FILE_PATH)
         self._variants_names = self.get(Configuration._SECTION_VARIANTS, Configuration._OPTION_LIST).split()
         self._verify_timeout_sec = self.getint(Configuration._SECTION_SIGNING_INFO,
                                                Configuration._OPTION_VERIFY_TIMEOUT_SEC)
@@ -196,14 +189,6 @@ class Configuration(configparser.ConfigParser):
     def host_bin_path(self) -> str:
         return self._host_bin_path
 
-    def java_home(self, java_version: int) -> str:
-        if java_version == 7:
-            return self._java_7_path
-        elif java_version == 8:
-            return self._java_8_path
-        else:
-            raise ValueError('Invalid Java version: {}'.format(java_version))
-
     def local_manifest_directory(self) -> str:
         return self._local_manifest_dir
 
@@ -242,9 +227,6 @@ class Configuration(configparser.ConfigParser):
 
     def signing_info(self) -> str:
         return self._signing_info
-
-    def source_env_file_path(self) -> str:
-        return self._source_env_file_path
 
     def variants(self) -> List[str]:
         return self._variants_names
