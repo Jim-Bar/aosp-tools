@@ -51,6 +51,7 @@ class Configuration(configparser.ConfigParser):
     _SECTION_REPOSITORY_MANIFEST = 'RepositoryManifest'
     _SECTION_SIGNING_INFO = 'SigningInfo'
     _SECTION_VARIANTS = 'Variants'
+    _SECTION_VENDORS = 'Vendors'
 
     _OPTION_BINARY_PATH = 'BinaryPath'
     _OPTION_DEPTH = 'Depth'
@@ -59,6 +60,7 @@ class Configuration(configparser.ConfigParser):
     _OPTION_GENERIC_REF = 'GenericRef'
     _OPTION_GROUPS = 'Groups'
     _OPTION_HOST_BIN_PATH = 'HostBinPath'
+    _OPTION_LINK = 'Link'
     _OPTION_LIST = 'List'
     _OPTION_TEMPLATE_NAME = 'TemplateName'
     _OPTION_MAKE_TARGET = 'MakeTarget'
@@ -147,6 +149,8 @@ class Configuration(configparser.ConfigParser):
         self._repo_trace = self.getboolean(Configuration._SECTION_REPO, Configuration._OPTION_TRACE)
         self._signing_info = self.get(Configuration._SECTION_SIGNING_INFO, Configuration._OPTION_PATH)
         self._variants_names = self.get(Configuration._SECTION_VARIANTS, Configuration._OPTION_LIST).split()
+        self._vendors_link = self.get(Configuration._SECTION_VENDORS, Configuration._OPTION_LINK)
+        self._vendors_path = self.get(Configuration._SECTION_VENDORS, Configuration._OPTION_PATH)
         self._verify_timeout_sec = self.getint(Configuration._SECTION_SIGNING_INFO,
                                                Configuration._OPTION_VERIFY_TIMEOUT_SEC)
 
@@ -230,6 +234,12 @@ class Configuration(configparser.ConfigParser):
 
     def variants(self) -> List[str]:
         return self._variants_names
+
+    def vendors_link(self) -> str:
+        return self._vendors_link
+
+    def vendors_path(self) -> str:
+        return self._vendors_path
 
     def verify_timeout_sec(self) -> int:
         return self._verify_timeout_sec

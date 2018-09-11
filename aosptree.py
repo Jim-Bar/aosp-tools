@@ -76,7 +76,11 @@ class AOSPTree(object):
                 # Repo sync.
                 RepoAdapter.sync(num_cores, configuration.repo_only_current_branch(), configuration.repo_no_tags())
 
-                return AOSPTree(path)
+            if not os.path.isdir(os.path.dirname(configuration.vendors_link())):
+                os.makedirs(os.path.dirname(configuration.vendors_link()))
+            os.symlink(configuration.vendors_path(), configuration.vendors_link())
+
+            return AOSPTree(path)
 
     @staticmethod
     def description(path: str, revision: str) -> str:
