@@ -60,16 +60,9 @@ class AOSPBuildCommandLineInterface(CommandLineInterface):
         parser.add_argument('-w', '--path',
                             help='path to the AOSP tree',
                             default=configuration.default_path())
-        parser.add_argument('-p', '--product',
-                            help='name of the target product',
-                            default=configuration.default_product())
         parser.add_argument('-t', '--target',
                             help='makefile target to build',
                             default=configuration.default_make_target())
-        parser.add_argument('-u', '--variant',
-                            help='build variant',
-                            choices=configuration.variants(),
-                            default=configuration.default_variant())
         parser.add_argument('-y', '--yes',
                             help='automatically continue when prompted',
                             action='store_true')
@@ -88,6 +81,37 @@ class AOSPBuildCommandLineInterface(CommandLineInterface):
         if self._args.cores == 0:  # Resolve the real number of available cores.
             return os.cpu_count()
         return self._args.cores
+
+    def path(self) -> str:
+        return os.path.realpath(self._args.path)
+
+    def _continue_when_prompted(self) -> bool:
+        return self._args.yes
+
+
+class AOSPSpecCommandLineInterface(CommandLineInterface):
+    def __init__(self, configuration: Configuration) -> None:
+        parser = argparse.ArgumentParser(description='Setup the specifications of an AOSP tree',
+                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+        parser.add_argument('-w', '--path',
+                            help='path to the AOSP tree',
+                            default=configuration.default_path())
+        parser.add_argument('-p', '--product',
+                            help='name of the target product',
+                            default=configuration.default_product())
+        parser.add_argument('-u', '--variant',
+                            help='build variant',
+                            choices=configuration.variants(),
+                            default=configuration.default_variant())
+        parser.add_argument('-y', '--yes',
+                            help='automatically continue when prompted',
+                            action='store_true')
+
+        # Parse and sanity checks.
+        self._args = parser.parse_args()
+        if not os.path.exists(self.path()):
+            parser.error('Path "{}" does not exist'.format(self.path()))
 
     def path(self) -> str:
         return os.path.realpath(self._args.path)

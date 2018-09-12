@@ -54,6 +54,7 @@ class Configuration(configparser.ConfigParser):
     _SECTION_VENDORS = 'Vendors'
 
     _OPTION_BINARY_PATH = 'BinaryPath'
+    _OPTION_BUILDSPEC_PATH = 'BuildspecPath'
     _OPTION_DEPTH = 'Depth'
     _OPTION_FLASH_SYSTEM_IMAGE_PATH = 'FlashSystemImagePath'
     _OPTION_FLASH_VBMETA_IMAGE_PATH = 'FlashVBMetaImagePath'
@@ -134,6 +135,7 @@ class Configuration(configparser.ConfigParser):
         name = self.get(Configuration._SECTION_REPOSITORY_MANIFEST, Configuration._OPTION_NAME)
         self._repository_manifest = Repository(protocol, user, url, path, name)
 
+        self._buildspec_path = self.get(Configuration._SECTION_AOSP_FILES, Configuration._OPTION_BUILDSPEC_PATH)
         self._ccache_bin_path = self.get(Configuration._SECTION_CCACHE, Configuration._OPTION_BINARY_PATH)
         self._ccache_path = self.get(Configuration._SECTION_CCACHE, Configuration._OPTION_PATH)
         self._host_bin_path = self.get(Configuration._SECTION_AOSP_FILES, Configuration._OPTION_HOST_BIN_PATH)
@@ -153,6 +155,9 @@ class Configuration(configparser.ConfigParser):
         self._vendors_path = self.get(Configuration._SECTION_VENDORS, Configuration._OPTION_PATH)
         self._verify_timeout_sec = self.getint(Configuration._SECTION_SIGNING_INFO,
                                                Configuration._OPTION_VERIFY_TIMEOUT_SEC)
+
+    def buildspec_path(self) -> str:
+        return self._buildspec_path
 
     def ccache_binary_path(self) -> str:
         return self._ccache_bin_path
