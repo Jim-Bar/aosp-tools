@@ -51,6 +51,16 @@ class AOSPSpec(object):
         return AOSPSpec.description(self._product, self._variant)
 
     @staticmethod
+    def description(product: str, variant: str) -> str:
+        description = list()
+        description.append('Product: {}'.format(product))
+        description.append('Variant: {}'.format(variant))
+        description.append('*' * max(map(len, description)))
+        description.insert(0, description[-1])
+
+        return '\n'.join(description)
+
+    @staticmethod
     def from_aosp_tree(aosp_tree: AOSPTree) -> 'AOSPSpec':
         """
         Reverse operation than :method:`setup`. Parse a buildspec file.
@@ -76,6 +86,9 @@ class AOSPSpec(object):
                         return AOSPSpec(product, variant)
 
         raise ValueError('Invalid buildspec file')
+
+    def product(self) -> str:
+        return self._product
 
     def setup(self, configuration: Configuration, aosp_tree: AOSPTree) -> None:
         """
@@ -111,16 +124,6 @@ class AOSPSpec(object):
                 os.unlink(AOSPSpec._BUILDSPEC_FILE_NAME)
 
             os.symlink(buildspec_file_path, AOSPSpec._BUILDSPEC_FILE_NAME)
-
-    @staticmethod
-    def description(product: str, variant: str) -> str:
-        description = list()
-        description.append('Product: {}'.format(product))
-        description.append('Variant: {}'.format(variant))
-        description.append('*' * max(map(len, description)))
-        description.insert(0, description[-1])
-
-        return '\n'.join(description)
 
 
 def main() -> None:

@@ -26,100 +26,70 @@
 #
 
 import contexts
-import json
+import getpass
 import os
-import shutil
 import subprocess
 
 from aospbuild import AOSPBuild
+from aospspec import AOSPSpec
 from aosptree import AOSPTree
-from avbtool import AVBToolAdapter
 from commandline import SignerCommandLineInterface
 from configuration import Configuration
 from sanity import SanityChecks
 
 
-# TODO: generate avbtool and then use it from out/host/... instead of using the one in external/avb/...
-# TODO: Before doing that, make sure this script is still needed.
 class Signer(object):
     """
-    Sign a ``system`` image and generate the corresponding ``vbmeta`` image. Note that the ``vbmeta`` image is generated
-    for the built ``system`` image **and** for the provided stock images (refer to the file ``signing_info.json`` for
-    more information.
+    Generate the signed files from a target file:
 
-    For more understanding you may refer to: https://android.googlesource.com/platform/external/avb.
+    - signed target file
+    - signed image file
+    - signed OTA file
+
+    The images/OTAs must be signed for release. See also: https://source.android.com/devices/tech/ota/sign_builds
     """
 
-    _FEC = 'fec'
+    # The script ``brillo_update_payload`` is a dependency of the signer scripts but is not built by default.
+    _BRILLO_UPDATE_PAYLOAD = 'brillo_update_payload'
 
-    @staticmethod
-    def sign(configuration: Configuration, aosp_tree: AOSPTree, product_name: str, image_path: str, key_path: str,
-             other_images_path: str, output_path: str) -> None:
-        avb_repository_path = configuration.repository_avb().get_path_name()
-        if avb_repository_path.startswith('platform/'):
-            avb_repository_path = avb_repository_path[len('platform/'):]  # Path in AOSP.
-        avb = AVBToolAdapter(os.path.join(aosp_tree.path(), avb_repository_path))
+    def __init__(self, key_path: str) -> None:
+        self._key_path = key_path
 
-        # Check that the image does not already contain a hashtree / footer.
-        try:
-            avb.info_image(image_path)
-            # If the command returns without raising an exception, it means the image has a hashtree / footer.
-            raise ValueError('The image {} is already signed. If you want to erase its signing information, use avbtool'
-                             .format(image_path))
-        except subprocess.CalledProcessError:
-            # Note that it is not possible to find out whether the failure happened because there is no vbmeta
-            # information (what we want to check here) or because of another cause, apart from analysing stderr.
-            pass
+    def sign(self, configuration: Configuration, aosp_tree: AOSPTree) -> None:
+        with contexts.set_cwd(aosp_tree.path()):
+            # Build `brillo_update_payload`` if it has not been built yet.
+            if not os.path.isfile(os.path.join(configuration.host_bin_path(), Signer._BRILLO_UPDATE_PAYLOAD)):
+                AOSPBuild(Signer._BRILLO_UPDATE_PAYLOAD).build(configuration, aosp_tree)
 
-        # Get signing information.
-        with contexts.open_local(configuration.signing_info()) as signing_info_file:
-            signing_info = json.load(signing_info_file)
-            hashtree_info = signing_info['add_hashtree_footer'][product_name]
-            vbmeta_info = signing_info['make_vbmeta_image'][product_name]
+            aosp_spec = AOSPSpec.from_aosp_tree(aosp_tree)
 
-        # Setup output directory.
-        if not os.path.exists(output_path):
-            os.makedirs(output_path)
-        # Rename on the fly to make sure the verification does not fail because the image is named differently.
-        signed_image_path = os.path.join(output_path, '{}.img'.format(hashtree_info['partition_name']))
-        shutil.copy(image_path, signed_image_path)
-        for image_name in vbmeta_info['include_descriptors_from_image']:
-            if image_name != os.path.basename(signed_image_path):  # Do not try to copy the image to sign.
-                shutil.copy(os.path.join(other_images_path, image_name), output_path)
+            target_file_name = '{}-target_files-eng.{}.zip'.format(aosp_spec.product(), getpass.getuser())
+            signed_target_file_name = '{}-signed_target_files-eng.{}.zip'.format(aosp_spec.product(), getpass.getuser())
+            signed_image_file_name = '{}-signed_img-eng.{}.zip'.format(aosp_spec.product(), getpass.getuser())
+            signed_ota_file_name = '{}-signed_ota-eng.{}.zip'.format(aosp_spec.product(), getpass.getuser())
+            target_file_path = os.path.join(configuration.dist_path(), target_file_name)
+            signed_target_file_path = os.path.join(configuration.dist_path(), signed_target_file_name)
+            signed_image_file_path = os.path.join(configuration.dist_path(), signed_image_file_name)
+            signed_ota_file_path = os.path.join(configuration.dist_path(), signed_ota_file_name)
 
-        # Add the hashtree footer to the image.
-        with contexts.append_to_path(os.path.join(aosp_tree.path(), configuration.host_bin_path())):
-            if hashtree_info['generate_fec']:  # Generate fec if it is needed.
-                Signer._make_fec(configuration, aosp_tree, product_name)
-            avb.add_hashtree_footer(signed_image_path, hashtree_info['partition_name'], hashtree_info['generate_fec'],
-                                    hashtree_info['fec_num_roots'], hashtree_info['hash_algorithm'],
-                                    hashtree_info['block_size'], hashtree_info['salt'], hashtree_info['algorithm'],
-                                    hashtree_info['rollback_index'], hashtree_info['setup_as_rootfs_from_kernel'])
+            # Sign target file.
+            if os.path.exists(signed_target_file_path):
+                os.remove(signed_target_file_path)
+            subprocess.check_call([os.path.join(configuration.release_tools_path(), 'sign_target_files_apks'), '-o',
+                                   '-d', self._key_path, target_file_path, signed_target_file_path])
 
-        # Generate the vbmeta image.
-        images_paths = [os.path.join(output_path, image_name)
-                        for image_name in vbmeta_info['include_descriptors_from_image']]
-        avb.make_vbmeta_image(os.path.join(output_path, '{}.img'.format(vbmeta_info['partition_name'])),
-                              vbmeta_info['algorithm'], key_path, vbmeta_info['rollback_index'], images_paths,
-                              vbmeta_info['padding_size'])
+            # Sign image file.
+            if os.path.exists(signed_image_file_path):
+                os.remove(signed_image_file_path)
+            subprocess.check_call([os.path.join(configuration.release_tools_path(), 'img_from_target_files'),
+                                   signed_target_file_path, signed_image_file_path])
 
-        # Verify the images.
-        with contexts.set_cwd(output_path):
-            # The working directory must be set where the images actually are because avbtool tries to load them from
-            # the current working directory by appending ``.img`` to the partition names found in vbmeta.
-            avb.verify_image('{}.img'.format(vbmeta_info['partition_name']), key_path,
-                             configuration.verify_timeout_sec())
-
-    @staticmethod
-    def _make_fec(configuration: Configuration, aosp_tree: AOSPTree, product_name: str) -> None:
-        try:
-            subprocess.check_call([Signer._FEC], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except subprocess.CalledProcessError:
-            # Exited because the arguments were missing, but the binary exists.
-            return
-        except FileNotFoundError:
-            # The binary does not exist, make it.
-            AOSPBuild(configuration, Signer._FEC, product_name).build(configuration, aosp_tree)
+            # Sign OTA file.
+            if os.path.exists(signed_ota_file_path):
+                os.remove(signed_ota_file_path)
+            subprocess.check_call([os.path.join(configuration.release_tools_path(), 'ota_from_target_files'), '-k',
+                                   os.path.join(self._key_path, 'releasekey'), signed_target_file_path,
+                                   signed_ota_file_path])
 
 
 def main() -> None:
@@ -127,8 +97,8 @@ def main() -> None:
 
     configuration = Configuration()
     cli = SignerCommandLineInterface(configuration)
-    Signer.sign(configuration, AOSPTree(cli.path()), cli.product(), cli.image_path(), cli.key_path(),
-                cli.other_images_path(), cli.output_path())
+    signer = Signer(cli.key_path())
+    signer.sign(configuration, AOSPTree(cli.path()))
 
 
 if __name__ == '__main__':

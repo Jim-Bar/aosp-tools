@@ -56,6 +56,7 @@ class Configuration(configparser.ConfigParser):
     _OPTION_BINARY_PATH = 'BinaryPath'
     _OPTION_BUILDSPEC_PATH = 'BuildspecPath'
     _OPTION_DEPTH = 'Depth'
+    _OPTION_DIST_PATH = 'DistPath'
     _OPTION_FLASH_SYSTEM_IMAGE_PATH = 'FlashSystemImagePath'
     _OPTION_FLASH_VBMETA_IMAGE_PATH = 'FlashVBMetaImagePath'
     _OPTION_GENERIC_REF = 'GenericRef'
@@ -73,6 +74,7 @@ class Configuration(configparser.ConfigParser):
     _OPTION_PATH = 'Path'
     _OPTION_PRODUCT = 'Product'
     _OPTION_PROTOCOL = 'Protocol'
+    _OPTION_RELEASE_TOOLS = 'ReleaseTools'
     _OPTION_SPECIFIC_REF = 'SpecificRef'
     _OPTION_TRACE = 'Trace'
     _OPTION_VARIANT = 'Variant'
@@ -138,11 +140,13 @@ class Configuration(configparser.ConfigParser):
         self._buildspec_path = self.get(Configuration._SECTION_AOSP_FILES, Configuration._OPTION_BUILDSPEC_PATH)
         self._ccache_bin_path = self.get(Configuration._SECTION_CCACHE, Configuration._OPTION_BINARY_PATH)
         self._ccache_path = self.get(Configuration._SECTION_CCACHE, Configuration._OPTION_PATH)
+        self._dist_path = self.get(Configuration._SECTION_AOSP_FILES, Configuration._OPTION_DIST_PATH)
         self._host_bin_path = self.get(Configuration._SECTION_AOSP_FILES, Configuration._OPTION_HOST_BIN_PATH)
         self._local_manifest_dir = self.get(Configuration._SECTION_LOCAL_MANIFEST, Configuration._OPTION_PATH)
         self._local_manifest_file = self.get(Configuration._SECTION_LOCAL_MANIFEST, Configuration._OPTION_NAME)
         self._local_manifest_template_file = self.get(Configuration._SECTION_LOCAL_MANIFEST,
                                                       Configuration._OPTION_TEMPLATE_NAME)
+        self._release_tools_path = self.get(Configuration._SECTION_AOSP_FILES, Configuration._OPTION_RELEASE_TOOLS)
         self._repo_depth = self.getint(Configuration._SECTION_REPO, Configuration._OPTION_DEPTH)
         self._repo_groups = self.get(Configuration._SECTION_REPO, Configuration._OPTION_GROUPS).split()
         self._repo_no_tags = self.getboolean(Configuration._SECTION_REPO, Configuration._OPTION_NO_TAGS)
@@ -195,6 +199,9 @@ class Configuration(configparser.ConfigParser):
     def default_variant(self) -> str:
         return self._default_variant
 
+    def dist_path(self) -> str:
+        return self._dist_path
+
     def host_bin_path(self) -> str:
         return self._host_bin_path
 
@@ -206,6 +213,9 @@ class Configuration(configparser.ConfigParser):
 
     def local_manifest_template_file(self) -> str:
         return self._local_manifest_template_file
+
+    def release_tools_path(self) -> str:
+        return self._release_tools_path
 
     def repo_depth(self) -> int:
         return self._repo_depth

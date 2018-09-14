@@ -269,54 +269,25 @@ class SignerCommandLineInterface(CommandLineInterface):
 
         # Required arguments.
         required_group = parser.add_argument_group('required arguments')
-        required_group.add_argument('-i', '--image',
-                                    help='path to the image to sign (it will not be overwritten)',
-                                    required=True,
-                                    default=argparse.SUPPRESS)
         required_group.add_argument('-k', '--key',
                                     help='path to the key to use for signing',
                                     required=True,
                                     default=argparse.SUPPRESS)
 
         # Optional arguments.
-        parser.add_argument('-j', '--others',
-                            help='path to the directory containing the other images used for generating vbmeta',
-                            default=configuration.default_path())
-        parser.add_argument('-o', '--output',
-                            help='path to the output directory (existing images will be overwritten)',
-                            default=configuration.default_path())
         parser.add_argument('-w', '--path',
                             help='path to the AOSP tree',
                             default=configuration.default_path())
-        parser.add_argument('-p', '--product',
-                            help='name of the target product',
-                            default=configuration.default_product())
 
         # Parse and sanity checks.
         self._args = parser.parse_args()
-        if not os.path.exists(self.image_path()):
-            parser.error('Path "{}" does not exist'.format(self.image_path()))
         if not os.path.exists(self.key_path()):
             parser.error('Path "{}" does not exist'.format(self.key_path()))
-        if not os.path.exists(self.other_images_path()):
-            parser.error('Path "{}" does not exist'.format(self.other_images_path()))
         if not os.path.exists(self.path()):
             parser.error('Path "{}" does not exist'.format(self.path()))
-
-    def image_path(self) -> str:
-        return os.path.realpath(self._args.image)
 
     def key_path(self) -> str:
         return os.path.realpath(self._args.key)
 
-    def other_images_path(self) -> str:
-        return os.path.realpath(self._args.others)
-
-    def output_path(self) -> str:
-        return os.path.realpath(self._args.output)
-
     def path(self) -> str:
         return os.path.realpath(self._args.path)
-
-    def product(self) -> str:
-        return self._args.product
