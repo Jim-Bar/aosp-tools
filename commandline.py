@@ -264,7 +264,7 @@ class LocalManifestCommandLineInterface(CommandLineInterface):
 
 class SignerCommandLineInterface(CommandLineInterface):
     def __init__(self, configuration: Configuration) -> None:
-        parser = argparse.ArgumentParser(description='Sign an image and generate the associated vbmeta',
+        parser = argparse.ArgumentParser(description='Sign a target file and generate image and OTA files',
                                          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
         # Required arguments.

@@ -43,8 +43,6 @@ class AOSPBuild(object):
     conjunction with :class:`AOSPSpec`.
     """
 
-    _BUILDSPEC_FILE_NAME = 'buildspec.mk'
-
     def __init__(self, make_target: str, num_cores: int=os.cpu_count()) -> None:
         self._make_target = make_target
         self._num_cores = num_cores

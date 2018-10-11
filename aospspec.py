@@ -121,7 +121,7 @@ class AOSPSpec(object):
                     buildspec_file.write(buildspec_content)
 
             if os.path.isfile(AOSPSpec._BUILDSPEC_FILE_NAME):
-                os.unlink(AOSPSpec._BUILDSPEC_FILE_NAME)
+                os.remove(AOSPSpec._BUILDSPEC_FILE_NAME)
 
             os.symlink(buildspec_file_path, AOSPSpec._BUILDSPEC_FILE_NAME)
 
