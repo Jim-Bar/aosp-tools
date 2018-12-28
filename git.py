@@ -109,7 +109,8 @@ class _GitUtils(object):
         # Parse the output of 'git ls-remote' which is of the form:
         # '55ab6b26b5d037db88ce8f816829048c8de1f181\trefs/heads/sailfish-7.1.1-int'
         git_refs_raw = [git_ref.decode() for git_ref in git_refs_raw]
-        git_refs_raw = [git_ref.split('/') for git_ref in git_refs_raw if '/heads/' in git_ref or '/tags/' in git_ref]
+        git_refs_raw = [git_ref.split('/', 2) for git_ref in git_refs_raw
+                        if '/heads/' in git_ref or '/tags/' in git_ref]
         git_heads = [git_head for _, git_type, git_head in git_refs_raw if git_type == 'heads']
         git_tags = [git_tag for _, git_type, git_tag in git_refs_raw if git_type == 'tags']
 
