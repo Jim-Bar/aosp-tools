@@ -89,7 +89,7 @@ class Configuration(configparser.ConfigParser):
         config_file_names = ['config.ini']
         with contexts.open_local(default_config_file_name) as default_config_file:
             self.read_file(default_config_file)
-        self.read(config_file_names)
+            self.read(config_file_names)
 
         self._default_flash_system_path = self.get(Configuration._SECTION_COMMAND_LINE_DEFAULTS,
                                                    Configuration._OPTION_FLASH_SYSTEM_IMAGE_PATH)
