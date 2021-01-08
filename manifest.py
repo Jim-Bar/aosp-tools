@@ -130,6 +130,10 @@ class LocalManifest(object):
         self._removed_projects = removed_projects
 
     @staticmethod
+    def empty() -> 'LocalManifest':
+        return LocalManifest(list(), list(), list(), list())
+
+    @staticmethod
     def from_file(local_manifest_path: str) -> 'LocalManifest':
         with open(local_manifest_path) as local_manifest_file:
             return LocalManifest.from_string(local_manifest_file.read())

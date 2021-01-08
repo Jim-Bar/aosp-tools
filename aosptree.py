@@ -57,8 +57,8 @@ class AOSPTree(object):
         return AOSPTree.description(self.path(), self.revision())
 
     @staticmethod
-    def clone(configuration: Configuration, path: str, revision: str,
-              local_manifest: LocalManifest, num_cores: int) -> 'AOSPTree':
+    def clone(configuration: Configuration, path: str, revision: str, local_manifest: LocalManifest,
+              num_cores: int) -> 'AOSPTree':
         os.mkdir(path)
 
         with contexts.set_cwd(path):
@@ -111,8 +111,11 @@ def main() -> None:
     cli = AOSPTreeCommandLineInterface(configuration)
     print(AOSPTree.description(cli.path(), cli.release()))
     if cli.press_enter():
-        AOSPTree.clone(configuration, cli.path(), cli.release(), LocalManifest.from_string(cli.local_manifest()),
-                       cli.num_cores())
+        if cli.has_local_manifest():
+            local_manifest = LocalManifest.from_string(cli.local_manifest())
+        else:
+            local_manifest = LocalManifest.empty()
+        AOSPTree.clone(configuration, cli.path(), cli.release(), local_manifest, cli.num_cores())
     else:
         sys.exit(os.EX_USAGE)  # Set an error code for canceling chained commands.
 

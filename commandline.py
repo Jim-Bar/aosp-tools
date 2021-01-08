@@ -134,7 +134,7 @@ class AOSPTreeCommandLineInterface(CommandLineInterface):
         # Required arguments.
         required_group = parser.add_argument_group('required arguments')
         required_group.add_argument('-r', '--release',
-                                    help='Android release tag (e.g. android-8.1.0_r41)',
+                                    help='Android release tag (e.g. android-10.0.0_r30)',
                                     required=True,
                                     default=argparse.SUPPRESS)
 
@@ -143,6 +143,11 @@ class AOSPTreeCommandLineInterface(CommandLineInterface):
                             help='number of cores to use; 0 for all cores',
                             default=configuration.default_num_cores(),
                             type=int)
+        parser.add_argument('-m', '--manifest',
+                            help='path to a local manifest to use, "-" to read from stdin',
+                            default=argparse.SUPPRESS,
+                            dest='local_manifest_path',
+                            metavar='MANIFEST')
         parser.add_argument('-n', '--name',
                             help='name of the directory of the AOSP tree',
                             default=configuration.default_name())
@@ -161,6 +166,17 @@ class AOSPTreeCommandLineInterface(CommandLineInterface):
         self._args = parser.parse_args()
         if self.num_cores() < 0:
             parser.error('-c/--cores must be greater than or equal to zero')
+        if self.has_local_manifest():
+            if self._args.local_manifest_path == '-':
+                self._local_manifest_string = sys.stdin.read()
+                # "Reopen" standard input. Required for reading further inputs (key presses).
+                sys.stdin = open('/dev/tty', 'r')
+            else:
+                if os.path.exists(self._args.local_manifest_path):
+                    with open(self._args.local_manifest_path) as local_manifest_file:
+                        self._local_manifest_string = local_manifest_file.read()
+                else:
+                    parser.error('Local manifest "{}" does not exist'.format(self._args.local_manifest_path))
         if not os.path.exists(os.path.dirname(self.path())):
             parser.error('Path "{}" does not exist'.format(self.path()))
         if os.path.exists(self.path()):
@@ -169,11 +185,15 @@ class AOSPTreeCommandLineInterface(CommandLineInterface):
                                 if bool(re.match('^android-\d+\.\d+\.\d+_r\d+$', tag))}
         if self.release() not in android_release_tags:
             parser.error('Android release "{}" does not exist'.format(self.release()))
-        self._local_manifest_string = sys.stdin.read()
-        sys.stdin = open('/dev/tty', 'r')  # "Reopen" standard input. Required for reading further inputs (key presses).
+
+    def has_local_manifest(self) -> bool:
+        return hasattr(self._args, 'local_manifest_path')
 
     def local_manifest(self) -> str:
-        return self._local_manifest_string
+        if self.has_local_manifest():
+            return self._local_manifest_string
+        else:
+            raise AttributeError('Requested local manifest, but there is none')
 
     def num_cores(self) -> int:
         if self._args.cores == 0:  # Resolve the real number of available cores.
