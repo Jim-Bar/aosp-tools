@@ -41,7 +41,7 @@ class Configuration(configparser.ConfigParser):
     _SECTION_AOSP_FILES = 'AOSPFiles'
     _SECTION_COMMAND_LINE_DEFAULTS = 'CommandLineDefaults'
     _SECTION_CCACHE = 'CCache'
-    _SECTION_GITAMA = 'Gitama'
+    _SECTION_GIT = 'Git'
     _SECTION_GOOGLE_SOURCE = 'GoogleSource'
     _SECTION_LOCAL_MANIFEST = 'LocalManifest'
     _SECTION_REPO = 'Repo'
@@ -123,9 +123,9 @@ class Configuration(configparser.ConfigParser):
         name = self.get(Configuration._SECTION_REPOSITORY_BUILD, Configuration._OPTION_NAME)
         self._repository_build = Repository(protocol, user, url, path, name)
 
-        protocol = self.get(Configuration._SECTION_GITAMA, Configuration._OPTION_PROTOCOL)
-        user = self.get(Configuration._SECTION_GITAMA, Configuration._OPTION_USER)
-        url = self.get(Configuration._SECTION_GITAMA, Configuration._OPTION_URL)
+        protocol = self.get(Configuration._SECTION_GIT, Configuration._OPTION_PROTOCOL)
+        user = self.get(Configuration._SECTION_GIT, Configuration._OPTION_USER)
+        url = self.get(Configuration._SECTION_GIT, Configuration._OPTION_URL)
         path = self.get(Configuration._SECTION_REPOSITORY_LOCAL_MANIFEST, Configuration._OPTION_PATH)
         name = self.get(Configuration._SECTION_REPOSITORY_LOCAL_MANIFEST, Configuration._OPTION_NAME)
         self._repository_local_manifest = Repository(protocol, user, url, path, name)
