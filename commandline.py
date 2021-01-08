@@ -182,7 +182,7 @@ class AOSPTreeCommandLineInterface(CommandLineInterface):
         if os.path.exists(self.path()):
             parser.error('Path "{}" already exists'.format(self.path()))
         android_release_tags = {tag for tag in configuration.repository_build().remote_refs()[1]
-                                if bool(re.match('^android-\d+\.\d+\.\d+_r\d+$', tag))}
+                                if bool(re.match('^android-(security-)*\d+\.\d+\.\d+_r\d+$', tag))}
         if self.release() not in android_release_tags:
             parser.error('Android release "{}" does not exist'.format(self.release()))
 
